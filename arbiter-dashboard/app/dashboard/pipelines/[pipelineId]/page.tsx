@@ -8,14 +8,14 @@ import { getPipeline, getPipelineRuns, getRunTasks } from "@/lib/api";
 import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
 
-export default async function PipelineDetailPage({ params }: { params: { id: string } }) {
-    const { id } = params;
+export default async function PipelineDetailPage({ params }: { params: { pipelineId: string } }) {
+    const { pipelineId } = params;
     const session = await getServerSession(authOptions);
-    const pipeline = await getPipeline(id, session?.accessToken);
+    const pipeline = await getPipeline(pipelineId, session?.accessToken);
     if (!pipeline) {
         notFound();
     }
-    const runs = await getPipelineRuns(id, session?.accessToken);
+    const runs = await getPipelineRuns(pipelineId, session?.accessToken);
     const latestRun = runs[0];
     const runTasks = latestRun ? await getRunTasks(latestRun.id, session?.accessToken) : [];
     const nodes = pipeline.dag_definition?.nodes.map((node) => ({

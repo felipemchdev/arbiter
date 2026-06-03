@@ -29,7 +29,7 @@ def upgrade() -> None:
     op.create_table(
         "organizations",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False, index=True),
         sa.Column("api_key", sa.String(length=255), nullable=False, unique=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
@@ -37,7 +37,7 @@ def upgrade() -> None:
         "pipelines",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("org_id", sa.Uuid(), sa.ForeignKey("organizations.id"), nullable=False, index=True),
-        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False, index=True),
         sa.Column("source", source_enum, nullable=False),
         sa.Column("dag_id", sa.String(length=255), nullable=True),
         sa.Column("last_run_status", run_status_enum, nullable=True),
@@ -48,9 +48,9 @@ def upgrade() -> None:
         "pipeline_runs",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("pipeline_id", sa.Uuid(), sa.ForeignKey("pipelines.id"), nullable=False, index=True),
-        sa.Column("run_id", sa.String(length=255), nullable=False),
+        sa.Column("run_id", sa.String(length=255), nullable=False, index=True),
         sa.Column("status", run_status_enum, nullable=False),
-        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False, index=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("duration_ms", sa.Integer(), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
@@ -62,7 +62,7 @@ def upgrade() -> None:
         sa.Column("run_id", sa.Uuid(), sa.ForeignKey("pipeline_runs.id"), nullable=False, index=True),
         sa.Column("task_id", sa.String(length=255), nullable=False),
         sa.Column("status", task_status_enum, nullable=False),
-        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False, index=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("duration_ms", sa.Integer(), nullable=True),
         sa.Column("try_number", sa.Integer(), nullable=False, server_default="1"),
@@ -84,7 +84,7 @@ def upgrade() -> None:
         sa.Column("run_id", sa.Uuid(), sa.ForeignKey("pipeline_runs.id"), nullable=True),
         sa.Column("type", alert_type_enum, nullable=False),
         sa.Column("message", sa.Text(), nullable=False),
-        sa.Column("resolved", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("resolved", sa.Boolean(), nullable=False, server_default=sa.text("false"), index=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
 

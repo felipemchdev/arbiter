@@ -18,8 +18,16 @@ class ArbiterSender:
                 f"{self.api_url}/api/v1/collector/airflow/sync",
                 json=payload,
                 headers={"X-API-Key": self.api_key},
-                timeout=10.0,
+                timeout=30.0,
             )
             response.raise_for_status()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("collector_send_failed", extra={"error": str(exc)})
+            result = response.json()
+            logger.info("collector_send_ok ingested=%d", result.get("ingested", 0))
+        except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "collector_send_http_error status=%d body=%s",
+                exc.response.status_code,
+                exc.response.text[:500],
+            )
+        except Exception as exc:
+            logger.warning("collector_send_failed error=%s", exc)

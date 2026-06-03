@@ -1,0 +1,51 @@
+name: Deploy Arbiter
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arbiter-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run tests
+        run: pytest app/tests/ -v
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: arbiteracr.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Build and push API
+        run: |
+          docker build -t arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} ./arbiter-api
+          docker push arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
+      - name: Build and push Dashboard
+        run: |
+          docker build -t arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }} ./arbiter-dashboard
+          docker push arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}
+      - name: Deploy API
+        run: az containerapp update --name arbiter-api --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
+      - name: Deploy Worker
+        run: az containerapp update --name arbiter-worker --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
+      - name: Deploy Dashboard
+        run: az containerapp update --name arbiter-dashboard --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}

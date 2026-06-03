@@ -1,3 +1,20 @@
+@font-face {
+  font-family: "Harmond";
+  src: url("/fonts/Harmond-SemiBoldCondensed.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Absans";
+  src: url("/fonts/Absans-Regular.woff2") format("woff2"),
+       url("/fonts/Absans-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -29,8 +46,14 @@ body {
         radial-gradient(circle at top right, rgba(129, 140, 248, 0.08), transparent 28%),
         var(--bg-base);
     color: var(--text-primary);
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    font-family: "Absans", ui-sans-serif, system-ui, sans-serif;
 }
+
+.font-harmond { font-family: "Harmond", ui-sans-serif, sans-serif; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pop-in { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
 
 a {
     color: inherit;

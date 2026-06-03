@@ -16,9 +16,9 @@ from app.services.alert_service import process_run_event_sync
 logger = logging.getLogger(__name__)
 
 
-async def list_pipelines(session: AsyncSession, org_id):
+async def list_pipelines(session: AsyncSession, org_id, limit: int = 50, offset: int = 0):
     result = await session.execute(
-        select(Pipeline).where(Pipeline.org_id == org_id).order_by(Pipeline.created_at.desc())
+        select(Pipeline).where(Pipeline.org_id == org_id).order_by(Pipeline.created_at.desc()).limit(limit).offset(offset)
     )
     return list(result.scalars().all())
 

@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert, AlertType
-from app.models.pipeline import Pipeline, RunStatus
+from app.models.pipeline import Pipeline
 from app.models.pipeline_run import PipelineRun
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,7 @@ async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> Non
         session.add(pipeline)
     session.add(run)
 
-    if run.status == RunStatus.failed:
+    if run.status.value == "failed":
         await create_alert(
             session,
             pipeline_id=run.pipeline_id,
@@ -77,20 +77,36 @@ async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> Non
 
 async def check_stale_pipelines_sync(session: AsyncSession) -> int:
     cutoff = datetime.now(UTC) - timedelta(hours=24)
-    result = await session.execute(select(Pipeline))
-    created = 0
-    for pipeline in result.scalars().all():
-        latest_result = await session.execute(
-            select(PipelineRun).where(PipelineRun.pipeline_id == pipeline.id).order_by(PipelineRun.started_at.desc()).limit(1)
+
+    latest_run_subq = (
+        select(
+            PipelineRun.pipeline_id,
+            func.max(PipelineRun.started_at).label("latest_started"),
         )
-        latest_run = latest_result.scalar_one_or_none()
-        if latest_run is None or (latest_run.started_at and latest_run.started_at < cutoff):
-            alert = await create_alert(
-                session,
-                pipeline_id=pipeline.id,
-                alert_type=AlertType.no_run,
-                message=f"No runs for pipeline {pipeline.name} in the last 24 hours",
-            )
-            if alert is not None:
-                created += 1
+        .group_by(PipelineRun.pipeline_id)
+        .subquery("latest_runs")
+    )
+
+    stale_pipelines = await session.execute(
+        select(Pipeline)
+        .outerjoin(
+            latest_run_subq,
+            Pipeline.id == latest_run_subq.c.pipeline_id,
+        )
+        .where(
+            (latest_run_subq.c.latest_started.is_(None))
+            | (latest_run_subq.c.latest_started < cutoff)
+        )
+    )
+
+    created = 0
+    for pipeline in stale_pipelines.scalars().all():
+        alert = await create_alert(
+            session,
+            pipeline_id=pipeline.id,
+            alert_type=AlertType.no_run,
+            message=f"No runs for pipeline {pipeline.name} in the last 24 hours",
+        )
+        if alert is not None:
+            created += 1
     return created

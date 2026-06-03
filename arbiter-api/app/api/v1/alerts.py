@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
@@ -11,9 +11,14 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[AlertRead])
-async def read_alerts(current_org=Depends(get_current_org), db: AsyncSession = Depends(get_db)):
+async def read_alerts(
+    current_org=Depends(get_current_org),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
     repository = AlertRepository(db)
-    return await repository.list_active(current_org.id)
+    return await repository.list_active(current_org.id, limit=limit, offset=offset)
 
 
 @router.put("/{alert_id}/resolve", response_model=AlertResolveResponse)

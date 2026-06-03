@@ -1,6 +1,11 @@
+from __future__ import annotations
+
+import logging
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -14,6 +19,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
+
+    def model_post_init(self, __context) -> None:
+        if self.secret_key == "change-me-in-production":
+            logger.warning("Using default SECRET_KEY - set ARBITER_SECRET_KEY env var for production.")
 
 
 @lru_cache

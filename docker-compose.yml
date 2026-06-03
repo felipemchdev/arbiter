@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: arbiter
+      POSTGRES_USER: arbiter
+      POSTGRES_PASSWORD: arbiter
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: ./arbiter-api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./arbiter-api:/app
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  worker:
+    build: ./arbiter-api
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app.workers.celery_app worker --loglevel=info
+
+  beat:
+    build: ./arbiter-api
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app.workers.celery_app beat --loglevel=info
+
+  dashboard:
+    build: ./arbiter-dashboard
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:

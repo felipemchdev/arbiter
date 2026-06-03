@@ -4,7 +4,7 @@ Arbiter is an open-source observability framework for data pipelines. It provide
 
 ## Architecture
 
-![Arbiter Architecture](/arbiter_architecture_diagram.svg)
+![Arbiter Architecture](/assets/arbiter_architecture_diagram.svg)
 
 ## Features
 

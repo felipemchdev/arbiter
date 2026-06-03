@@ -1,0 +1,2 @@
+class ArbiterError(Exception):
+    pass

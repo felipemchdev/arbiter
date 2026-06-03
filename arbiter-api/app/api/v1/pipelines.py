@@ -9,8 +9,13 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[PipelineRead])
-async def read_pipelines(current_org=Depends(get_current_org), db: AsyncSession = Depends(get_db)):
-    return await list_pipelines(db, current_org.id)
+async def read_pipelines(
+    current_org=Depends(get_current_org),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    return await list_pipelines(db, current_org.id, limit=limit, offset=offset)
 
 
 @router.post("", response_model=PipelineRead, status_code=status.HTTP_201_CREATED)

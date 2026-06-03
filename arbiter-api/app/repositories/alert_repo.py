@@ -12,12 +12,14 @@ class AlertRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_active(self, org_id):
+    async def list_active(self, org_id, limit: int = 50, offset: int = 0):
         result = await self.session.execute(
             select(Alert)
             .join(Alert.pipeline)
             .where(Alert.resolved.is_(False), Alert.pipeline.has(org_id=org_id))
             .order_by(Alert.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
         return list(result.scalars().all())
 

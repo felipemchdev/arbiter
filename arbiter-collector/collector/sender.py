@@ -12,7 +12,7 @@ class ArbiterSender:
         self.api_url = api_url.rstrip("/")
         self.api_key = api_key
 
-    def send(self, payload: dict) -> None:
+    def send(self, payload: dict) -> bool:
         try:
             response = httpx.post(
                 f"{self.api_url}/api/v1/collector/airflow/sync",
@@ -23,11 +23,14 @@ class ArbiterSender:
             response.raise_for_status()
             result = response.json()
             logger.info("collector_send_ok ingested=%d", result.get("ingested", 0))
+            return True
         except httpx.HTTPStatusError as exc:
             logger.warning(
                 "collector_send_http_error status=%d body=%s",
                 exc.response.status_code,
                 exc.response.text[:500],
             )
+            return False
         except Exception as exc:
             logger.warning("collector_send_failed error=%s", exc)
+            return False

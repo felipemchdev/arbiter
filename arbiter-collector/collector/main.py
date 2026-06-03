@@ -8,6 +8,9 @@ from collector.airflow import AirflowClient
 from collector.config import settings
 from collector.sender import ArbiterSender
 
+INITIAL_BACKOFF = 10
+MAX_BACKOFF = 300
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -79,10 +82,27 @@ def run_loop(
     airflow_client = AirflowClient(airflow_url, airflow_user, airflow_pass)
     sender = ArbiterSender(arbiter_api, arbiter_key)
     logger.info("collector_started interval=%d", interval)
+    failures = 0
     while True:
-        logger.info("collector_poll_start")
-        payload = build_payload(airflow_client)
-        sender.send(payload)
+        try:
+            logger.info("collector_poll_start")
+            payload = build_payload(airflow_client)
+            success = sender.send(payload)
+            if success:
+                failures = 0
+            else:
+                failures += 1
+                backoff = min(INITIAL_BACKOFF * (2 ** failures), MAX_BACKOFF)
+                logger.warning("collector_send_failed_backoff failures=%d backoff=%ds", failures, backoff)
+                time.sleep(backoff)
+                continue
+        except Exception as exc:
+            logger.warning("collector_poll_error error=%s", exc)
+            failures += 1
+            backoff = min(INITIAL_BACKOFF * (2 ** failures), MAX_BACKOFF)
+            logger.warning("collector_backoff failures=%d backoff=%ds", failures, backoff)
+            time.sleep(backoff)
+            continue
         time.sleep(interval)
 
 

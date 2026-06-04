@@ -6,10 +6,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import jwt
+from passlib.context import CryptContext
 
 from app.core.config import settings
 
 ALGORITHM = "HS256"
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def generate_raw_api_key() -> str:
@@ -24,9 +26,17 @@ def verify_api_key(raw_api_key: str, hashed_api_key: str) -> bool:
     return hash_api_key(raw_api_key) == hashed_api_key
 
 
-def create_access_token(*, org_id: str, org_name: str) -> str:
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_context.verify(plain, hashed)
+
+
+def create_access_token(*, sub: str, org_id: str, role: str = "viewer") -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": org_id, "org_name": org_name, "exp": expire}
+    payload = {"sub": sub, "org_id": org_id, "role": role, "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 

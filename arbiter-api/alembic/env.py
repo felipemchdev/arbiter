@@ -22,6 +22,7 @@ from app.models.organization import Organization
 from app.models.pipeline import Pipeline
 from app.models.pipeline_run import PipelineRun
 from app.models.task_instance import TaskInstance
+from app.models.user import User
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
@@ -63,4 +64,4 @@ async def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    asyncio.run(run_migrations_online()) 

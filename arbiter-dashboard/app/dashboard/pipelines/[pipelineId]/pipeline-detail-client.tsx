@@ -13,15 +13,15 @@ import type { Pipeline, PipelineRun, Alert, TaskInstance } from "@/lib/types";
 
 function Tabs({ active, onTab, tabs }: { active: string; onTab: (v: string) => void; tabs: string[] }) {
   return (
-    <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-1">
+    <div className="flex gap-6 border-b border-[var(--border)]">
       {tabs.map((tab) => (
         <button
           key={tab}
           onClick={() => onTab(tab)}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+          className={`px-1 py-3 text-sm font-medium transition font-sans ${
             active === tab
-              ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm"
-              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              ? "border-b-2 border-[var(--accent-blue)] text-[var(--accent-blue)]"
+              : "border-b-2 border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)]"
           }`}
         >
           {tab}

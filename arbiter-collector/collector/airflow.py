@@ -12,11 +12,13 @@ class AirflowClient:
     password: str
 
     def _client(self) -> httpx.Client:
-        return httpx.Client(
+        if not hasattr(self,"_cached_client"):
+            self._cached_client = httpx.Client(
             base_url=self.base_url.rstrip("/"),
             auth=(self.username, self.password),
             timeout=15.0,
-        )
+            )
+        return self._cached_client
 
     def get_dags(self) -> list[dict]:
         with self._client() as client:

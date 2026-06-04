@@ -6,7 +6,7 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function TableHead({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("text-left text-[12px] uppercase tracking-wider text-[var(--text-muted)]", className)} {...props} />;
+  return <thead className={cn("bg-[rgba(10,18,40,0.50)] border-b border-[var(--border)] text-left text-[12px] uppercase tracking-[0.05em] text-[var(--text-muted)]", className)} {...props} />;
 }
 
 export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
@@ -14,7 +14,7 @@ export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSecti
 }
 
 export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("border-b border-[var(--border)]", className)} {...props} />;
+  return <tr className={cn("border-b border-[rgba(100,140,220,0.06)] text-[var(--text-primary)] hover:bg-[rgba(74,144,217,0.04)] transition-colors", className)} {...props} />;
 }
 
 export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {

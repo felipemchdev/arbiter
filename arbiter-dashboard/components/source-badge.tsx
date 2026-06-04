@@ -7,10 +7,10 @@ export function SourceBadge({ source }: { source?: PipelineSource | string | nul
   const value = (source || "sdk") as string;
   const color =
     value === "airflow"
-      ? "text-[#00C7D3] border-[rgba(0,199,211,0.18)]"
+      ? "text-[var(--accent-blue)] border-[rgba(74,144,217,0.18)] bg-[rgba(74,144,217,0.08)]"
       : value === "azure_function"
-        ? "text-[#9B59B6] border-[rgba(155,89,182,0.18)]"
-        : "text-[var(--accent-blue)] border-[rgba(56,189,248,0.18)]";
+        ? "text-[#9B59B6] border-[rgba(155,89,182,0.18)] bg-[rgba(155,89,182,0.08)]"
+        : "text-[var(--text-muted)] border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.05)]";
 
   const label =
     value === "airflow"

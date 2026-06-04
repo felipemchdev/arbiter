@@ -49,8 +49,7 @@ async def ingest_run(session: AsyncSession, org_id, payload: RunPayload) -> Pipe
         run.duration_ms = payload.duration_ms
         run.error_message = payload.error_message
     session.add(run)
-    await session.commit()
-    await session.refresh(run)
+    await session.flush()
 
     await session.execute(delete(TaskInstance).where(TaskInstance.run_id == run.id))
     for task_payload in payload.tasks:

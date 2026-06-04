@@ -94,6 +94,7 @@ async def check_stale_pipelines_sync(session: AsyncSession) -> int:
             Pipeline.id == latest_run_subq.c.pipeline_id,
         )
         .where(
+            Pipeline.created_at < datetime.now(UTC) - timedelta(hours=24),
             (latest_run_subq.c.latest_started.is_(None))
             | (latest_run_subq.c.latest_started < cutoff)
         )

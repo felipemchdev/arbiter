@@ -1,3 +1,4 @@
+import { Buffer } from "buffer";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
 
@@ -40,10 +41,10 @@ export const authOptions: NextAuthOptions = {
                 token.accessToken = user.accessToken;
                 token.orgId = user.orgId;
             }
-            return token;
+            if (token.accessToken) { try { const payload = JSON.parse(Buffer.from((token.accessToken as string).split(".")[1], "base64").toString()) as { exp: number }; if (Date.now() >= payload.exp * 1000) { return { ...token, error: "TokenExpired" }; } } catch {} } return token;
         },
         async session({ session, token }) {
-            session.accessToken = token.accessToken;
+            if (token.error === "TokenExpired") { (session as any).error = "TokenExpired"; return session; } session.accessToken = token.accessToken;
             session.orgId = token.orgId;
             return session;
         },

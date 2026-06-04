@@ -74,6 +74,5 @@ async def upsert_dag_definition(session: AsyncSession, pipeline: Pipeline, nodes
         dag.edges = edges
         dag.updated_at = datetime.now(UTC)
     session.add(dag)
-    await session.commit()
-    await session.refresh(dag)
+    await session.flush()
     return dag

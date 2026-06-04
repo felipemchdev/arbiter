@@ -37,4 +37,5 @@ async def airflow_sync(
                 ),
             )
             ingested += 1
+    await db.commit()
     return {"ingested": ingested}

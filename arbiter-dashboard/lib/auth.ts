@@ -1,5 +1,7 @@
+import { Buffer } from "buffer";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthOptions } from "next-auth";
+import { jwtDecode } from "jwt-decode";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -25,10 +27,14 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
                 const data = (await response.json()) as { access_token: string };
+                // Decode backend JWT to extract the real expiry so we can detect
+                // token expiration on subsequent requests without an extra round-trip.
+                const decoded = jwtDecode<{ exp: number }>(data.access_token);
                 return {
                     id: credentials?.username || "org",
                     name: credentials?.username || "Arbiter",
                     accessToken: data.access_token,
+                    accessTokenExpires: decoded.exp * 1000, // ms
                     orgId: credentials?.username || "org",
                 };
             },
@@ -38,13 +44,19 @@ export const authOptions: NextAuthOptions = {
         async jwt({ token, user }) {
             if (user) {
                 token.accessToken = user.accessToken;
+                token.accessTokenExpires = user.accessTokenExpires;
                 token.orgId = user.orgId;
+            }
+            // Flag the token as expired so pages/components can react appropriately.
+            if (Date.now() > (token.accessTokenExpires as number ?? 0)) {
+                token.error = "AccessTokenExpired";
             }
             return token;
         },
         async session({ session, token }) {
             session.accessToken = token.accessToken;
             session.orgId = token.orgId;
+            session.error = token.error;  // forward to client
             return session;
         },
     },

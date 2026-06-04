@@ -49,7 +49,8 @@ export async function apiPut<T>(path: string, body: unknown, token: string): Pro
 }
 
 async function apiFetch<T>(path: string, token?: string, init: RequestInit = {}): Promise<T | null> {
-  const response = await fetch(`${API_URL}${path}`, {
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -62,10 +63,9 @@ async function apiFetch<T>(path: string, token?: string, init: RequestInit = {})
     return null;
   }
   return response.json() as Promise<T>;
-}
-
-export async function getPipelines(token?: string) {
-  return (await apiFetch<Pipeline[]>("/api/v1/pipelines", token)) ?? [];
+  } catch {
+    return null;
+  }
 }
 
 export async function getPipeline(id: string, token?: string) {

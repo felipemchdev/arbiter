@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.pipeline import Pipeline, PipelineSource, RunStatus
 from app.models.pipeline_run import PipelineRun
@@ -28,8 +29,13 @@ async def ingest_run(session: AsyncSession, org_id, payload: RunPayload) -> Pipe
         dag_id=payload.dag_id,
     )
 
+    # SELECT FOR UPDATE serializes concurrent upserts for the same (pipeline_id, run_id).
+    # Without this lock, two simultaneous requests both read None and both INSERT,
+    # producing duplicate rows (there was no UNIQUE constraint before 0002_unique_run_id).
     result = await session.execute(
-        select(PipelineRun).where(PipelineRun.pipeline_id == pipeline.id, PipelineRun.run_id == payload.run_id)
+        select(PipelineRun)
+        .where(PipelineRun.pipeline_id == pipeline.id, PipelineRun.run_id == payload.run_id)
+        .with_for_update()
     )
     run = result.scalar_one_or_none()
     if run is None:
@@ -49,9 +55,12 @@ async def ingest_run(session: AsyncSession, org_id, payload: RunPayload) -> Pipe
         run.duration_ms = payload.duration_ms
         run.error_message = payload.error_message
     session.add(run)
-    await session.commit()
-    await session.refresh(run)
+    # Flush to get run.id without committing — tasks and dag_definition
+    # are added below in the same transaction.
+    await session.flush()
 
+    # Delete-and-reinsert tasks within the same transaction as the run flush.
+    # This is now atomic: if anything fails, the whole transaction rolls back.
     await session.execute(delete(TaskInstance).where(TaskInstance.run_id == run.id))
     for task_payload in payload.tasks:
         task = TaskInstance(
@@ -68,18 +77,25 @@ async def ingest_run(session: AsyncSession, org_id, payload: RunPayload) -> Pipe
         session.add(task)
 
     if payload.nodes or payload.edges:
+        # upsert_dag_definition no longer commits internally
         await upsert_dag_definition(session, pipeline, payload.nodes, payload.edges)
 
+    # process_run_event_sync updates pipeline.last_run_status and creates alerts —
+    # all still in the same open transaction.
+    await process_run_event_sync(session, run)
+
+    # Single commit covering: run, tasks, dag_definition, pipeline metadata, alert.
     await session.commit()
     await session.refresh(run)
-
-    await process_run_event_sync(session, run)
     logger.info("run_ingested", extra={"run_id": str(run.id), "pipeline_id": str(pipeline.id)})
     return run
 
 
 async def get_run(session: AsyncSession, run_id, org_id) -> PipelineRun | None:
-    run_uuid = UUID(str(run_id))
+    try:
+        run_uuid = UUID(str(run_id))
+    except ValueError:
+        return None  # malformed UUID → caller raises 404, no 500
     result = await session.execute(
         select(PipelineRun)
         .join(Pipeline)

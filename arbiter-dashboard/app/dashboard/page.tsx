@@ -24,7 +24,7 @@ export default async function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-[1.35fr_0.9fr]">
         <Card>
           <CardHeader>
-            <div className="text-lg font-semibold">Runs por dia</div>
+            <div className="text-lg font-semibold font-display text-[var(--text-primary)]">Runs por dia</div>
           </CardHeader>
           <CardContent>
             <RunsChart runsToday={metrics.runs_today} />
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <div className="text-lg font-semibold">Active Alerts</div>
+            <div className="text-lg font-semibold font-display text-[var(--text-primary)]">Active Alerts</div>
           </CardHeader>
           <CardContent>
             <AlertList alerts={alerts} token={token} />

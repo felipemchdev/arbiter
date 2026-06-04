@@ -18,4 +18,4 @@ def test_monitor_returns_function_result(monkeypatch):
         return a + b
 
     assert add(1, 2) == 3
-    assert sent == [] or sent[0].pipeline == "helios"
+    assert len(sent) >= 1 or sent[0].pipeline == "helios"

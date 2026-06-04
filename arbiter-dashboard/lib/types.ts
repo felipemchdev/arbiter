@@ -16,8 +16,8 @@ export interface DagEdge {
 }
 
 export interface DagDefinition {
-  nodes: DagNode[];
-  edges: DagEdge[];
+  nodes: DagNode[] | null;
+  edges: DagEdge[] | null;
 }
 
 export interface Pipeline {

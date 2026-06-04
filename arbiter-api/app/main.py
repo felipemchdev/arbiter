@@ -19,10 +19,10 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title=settings.project_name, lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://arbiter-dashboard.wonderfulbush-04a41aac.eastus.azurecontainerapps.io","http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET","POST","PUT","DELETE"],
+    allow_headers=["Authorization","Content-Type","X-API-Key"],
 )
 install_exception_handlers(app)
 app.include_router(v1_router, prefix=settings.api_v1_str)

@@ -28,21 +28,14 @@ RETRY_DELAY = 60
 def process_run_event(self, run_id: str) -> None:
     async def _run() -> None:
         async with async_session_maker() as session:
-            result = await session.execute(select(PipelineRun).where(PipelineRun.id == run_id))
+            result = await session.execute(select(PipelineRun).where(PipelineRun.id == run_id).with_for_update())
             run = result.scalar_one_or_none()
             if run is None:
                 logger.warning("process_run_event_run_not_found run_id=%s", run_id)
                 return
             await process_run_event_sync(session, run)
 
-    try:
-        asyncio.run(_run())
-    except Exception as exc:
-        logger.warning(
-            "process_run_event_retry run_id=%s attempt=%s/%s error=%s",
-            run_id, self.request.retries + 1, MAX_RETRIES, exc,
-        )
-        raise self.retry(exc=exc)
+    asyncio.run(_run())
 
 
 @shared_task(
@@ -51,17 +44,11 @@ def process_run_event(self, run_id: str) -> None:
     autoretry_for=(Exception,),
     max_retries=MAX_RETRIES,
     default_retry_delay=RETRY_DELAY,
+    retry_backoff=True,
 )
 def check_stale_pipelines(self) -> int:
     async def _run() -> int:
         async with async_session_maker() as session:
             return await check_stale_pipelines_sync(session)
 
-    try:
-        return asyncio.run(_run())
-    except Exception as exc:
-        logger.warning(
-            "check_stale_pipelines_retry attempt=%s/%s error=%s",
-            self.request.retries + 1, MAX_RETRIES, exc,
-        )
-        raise self.retry(exc=exc)
+    return asyncio.run(_run())

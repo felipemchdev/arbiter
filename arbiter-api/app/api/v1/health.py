@@ -8,7 +8,6 @@ from app.api.deps import get_current_org, get_db
 from app.core.redis import redis_client
 from app.models.pipeline import Pipeline, RunStatus
 from app.models.pipeline_run import PipelineRun
-from app.services.pipeline_service import list_pipelines
 
 router = APIRouter()
 
@@ -31,7 +30,12 @@ async def health(db: AsyncSession = Depends(get_db)):
 @router.get("/metrics")
 async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depends(get_db)):
     today = datetime.now(UTC).date()
-    pipelines = await list_pipelines(db, current_org.id)
+    from sqlalchemy import func
+    count_result = await db.execute(
+        select(func.count()).select_from(Pipeline)
+        .where(Pipeline.org_id == current_org.id, Pipeline.last_run_status != RunStatus.failed)
+    )
+    active_pipelines = count_result.scalar_one()
     run_result = await db.execute(
         text(
             """
@@ -47,7 +51,6 @@ async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depen
     row = run_result.first()
     total_runs = int(row.total or 0) if row else 0
     failed_runs = int(row.failed or 0) if row else 0
-    active_pipelines = len([pipeline for pipeline in pipelines if pipeline.last_run_status != RunStatus.failed])
     avg_duration_result = await db.execute(
         text(
             """

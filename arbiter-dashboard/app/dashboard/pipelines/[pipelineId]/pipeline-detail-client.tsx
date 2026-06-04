@@ -13,15 +13,15 @@ import type { Pipeline, PipelineRun, Alert, TaskInstance } from "@/lib/types";
 
 function Tabs({ active, onTab, tabs }: { active: string; onTab: (v: string) => void; tabs: string[] }) {
   return (
-    <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-1">
+    <div className="flex gap-6 border-b border-[var(--border)]">
       {tabs.map((tab) => (
         <button
           key={tab}
           onClick={() => onTab(tab)}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+          className={`px-1 py-3 text-sm font-medium transition font-sans ${
             active === tab
-              ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm"
-              : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              ? "border-b-2 border-[var(--accent-blue)] text-[var(--accent-blue)]"
+              : "border-b-2 border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)]"
           }`}
         >
           {tab}
@@ -48,6 +48,7 @@ export default function PipelineDetailClient({
 
   const nodes = (pipeline.dag_definition?.nodes ?? []).map((n) => ({ ...n, status: tasks.find((t) => t.task_id === n.id)?.status ?? undefined }));
   const edges = pipeline.dag_definition?.edges ?? [];
+  const hasDag = pipeline.dag_definition != null && (pipeline.dag_definition.nodes?.length ?? 0) > 0;
   const taskDetails = tasks.map((t) => ({
     task_id: t.task_id,
     status: t.status,
@@ -59,7 +60,7 @@ export default function PipelineDetailClient({
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-3xl font-semibold">{pipeline.name}</div>
+        <div className="text-3xl font-semibold font-display text-[var(--text-primary)]">{pipeline.name}</div>
         <div className="mt-2 flex items-center gap-3">
           <StatusBadge status={pipeline.last_run_status} />
           <SourceBadge source={pipeline.source} />
@@ -71,7 +72,7 @@ export default function PipelineDetailClient({
       {tab === "Grafo" && (
         <Card>
           <CardContent className="p-0">
-            {pipeline.dag_definition ? (
+            {hasDag ? (
               <DagGraph nodes={nodes as any} edges={edges as any} tasks={taskDetails as any} />
             ) : (
               <div className="flex h-[400px] items-center justify-center text-sm text-[var(--text-muted)]">
@@ -132,7 +133,7 @@ export default function PipelineDetailClient({
       {tab === "Alertas" && (
         <Card>
           <CardHeader>
-            <div className="text-lg font-semibold">Pipeline Alerts</div>
+            <div className="text-lg font-semibold font-display text-[var(--text-primary)]">Pipeline Alerts</div>
           </CardHeader>
           <CardContent>
             <AlertList alerts={alerts} token={token} />

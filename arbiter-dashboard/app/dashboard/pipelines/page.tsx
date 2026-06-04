@@ -15,7 +15,7 @@ export default async function PipelinesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Pipelines</h1>
+        <h1 className="text-3xl font-semibold font-display text-[var(--text-primary)]">Pipelines</h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">{pipelines.length} pipelines found</p>
       </div>
 

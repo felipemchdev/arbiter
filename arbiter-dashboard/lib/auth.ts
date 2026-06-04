@@ -54,9 +54,9 @@ export const authOptions: NextAuthOptions = {
             return token;
         },
         async session({ session, token }) {
-            session.accessToken = token.accessToken;
-            session.orgId = token.orgId;
-            session.error = token.error;  // forward to client
+            (session as any).accessToken = token.accessToken;
+            (session as any).orgId = token.orgId;
+            (session as any).error = token.error;  // forward to client
             return session;
         },
     },

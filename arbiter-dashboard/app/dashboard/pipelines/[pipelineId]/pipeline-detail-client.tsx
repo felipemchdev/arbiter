@@ -60,7 +60,7 @@ export default function PipelineDetailClient({
   return (
     <div className="space-y-6">
       <div>
-        <div className="text-3xl font-semibold">{pipeline.name}</div>
+        <div className="text-3xl font-semibold font-display text-[var(--text-primary)]">{pipeline.name}</div>
         <div className="mt-2 flex items-center gap-3">
           <StatusBadge status={pipeline.last_run_status} />
           <SourceBadge source={pipeline.source} />
@@ -133,7 +133,7 @@ export default function PipelineDetailClient({
       {tab === "Alertas" && (
         <Card>
           <CardHeader>
-            <div className="text-lg font-semibold">Pipeline Alerts</div>
+            <div className="text-lg font-semibold font-display text-[var(--text-primary)]">Pipeline Alerts</div>
           </CardHeader>
           <CardContent>
             <AlertList alerts={alerts} token={token} />

@@ -11,7 +11,7 @@ const statusColors: Record<string, { color: string; bg: string }> = {
   sdk:              { color: "#94A3B8", bg: "rgba(148,163,184,0.12)" },
 };
 
-export function StatusBadge({ status }: { status: RunStatus | TaskStatus | string | null }) {
+export function StatusBadge({ status }: { status: RunStatus | TaskStatus | string | null | undefined }) {
   const val = (status || "skipped") as string;
   const c = statusColors[val] || statusColors["skipped"];
   return (

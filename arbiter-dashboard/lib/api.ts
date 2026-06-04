@@ -102,3 +102,7 @@ export async function getMetrics(token?: string) {
 export async function resolveAlert(id: string, token?: string) {
   return await apiFetch(`/api/v1/alerts/${id}/resolve`, token, { method: "PUT" });
 }
+
+export async function getPipelines(token?: string) {
+  return (await apiFetch<Pipeline[]>("/api/v1/pipelines", token)) ?? [];
+}

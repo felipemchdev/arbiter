@@ -28,18 +28,18 @@ export default function AlertsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold">Alerts</h1>
+        <h1 className="text-3xl font-semibold font-display text-[var(--text-primary)]">Alerts</h1>
       </div>
 
-      <div className="flex gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-1 w-fit">
+      <div className="flex gap-6 border-b border-[var(--border)] w-full">
         {["all", "failure", "duration_exceeded", "no_run"].map((type) => (
           <button
             key={type}
             onClick={() => setFilter(type)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${
+            className={`px-1 py-3 text-sm font-medium capitalize transition font-sans ${
               filter === type
-                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm"
-                : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                ? "border-b-2 border-[var(--accent-blue)] text-[var(--accent-blue)]"
+                : "border-b-2 border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)]"
             }`}
           >
             {type === "all" ? "All" : type.replace("_", " ")}
@@ -49,7 +49,7 @@ export default function AlertsPage() {
 
       <Card>
         <CardHeader>
-          <div className="text-lg font-semibold">{filtered.length} alerts</div>
+          <div className="text-lg font-semibold font-display text-[var(--text-primary)]">{filtered.length} alerts</div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -57,7 +57,7 @@ export default function AlertsPage() {
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--accent-blue)]" />
             </div>
           ) : filtered.length === 0 ? (
-            <div className="py-8 text-center text-sm text-[var(--text-muted)]">No alerts found.</div>
+            <div className="py-8 text-center text-sm text-[var(--text-muted)] font-sans">No alerts found.</div>
           ) : (
             <AlertList alerts={filtered} token={token} />
           )}

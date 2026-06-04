@@ -43,9 +43,9 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token.accessToken = user.accessToken;
-                token.accessTokenExpires = user.accessTokenExpires;
-                token.orgId = user.orgId;
+                token.accessToken = (user as any).accessToken;
+                token.accessTokenExpires = (user as any).accessTokenExpires;
+                token.orgId = (user as any).orgId;
             }
             // Flag the token as expired so pages/components can react appropriately.
             if (Date.now() > (token.accessTokenExpires as number ?? 0)) {
@@ -54,9 +54,9 @@ export const authOptions: NextAuthOptions = {
             return token;
         },
         async session({ session, token }) {
-            session.accessToken = token.accessToken;
-            session.orgId = token.orgId;
-            session.error = token.error;  // forward to client
+            (session as any).accessToken = token.accessToken;
+            (session as any).orgId = token.orgId;
+            (session as any).error = token.error;  // forward to client
             return session;
         },
     },

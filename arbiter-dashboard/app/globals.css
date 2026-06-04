@@ -1,17 +1,10 @@
-@font-face {
-  font-family: "Harmond";
-  src: url("/fonts/Harmond-SemiBoldCondensed.otf") format("opentype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap');
 
+/* TODO: replace with Pragmatica Extended */
 @font-face {
-  font-family: "Absans";
-  src: url("/fonts/Absans-Regular.woff2") format("woff2"),
-       url("/fonts/Absans-Regular.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
+  font-family: "Pragmatica Extended";
+  src: local("Inter"); /* Fallback for now */
+  font-weight: 600;
   font-display: swap;
 }
 
@@ -20,18 +13,34 @@
 @tailwind utilities;
 
 :root {
-    --bg-base: #06060f;
-    --bg-surface: #09090f;
-    --bg-card: #0d0d18;
-    --border: rgba(56, 189, 248, 0.07);
-    --accent-blue: #38bdf8;
-    --accent-purple: #818cf8;
-    --text-primary: #f1f5f9;
-    --text-muted: #475569;
-    --status-success: #22c55e;
-    --status-failed: #ef4444;
-    --status-running: #f59e0b;
-    --status-skipped: #64748b;
+  /* Backgrounds */
+  --bg-base: #000000;
+  --bg-surface: rgba(20, 35, 65, 0.55);
+  --bg-card: rgba(25, 42, 78, 0.60);
+  --bg-card-hover: rgba(30, 50, 90, 0.70);
+
+  /* Bordas */
+  --border: rgba(100, 140, 220, 0.15);
+  --border-hover: rgba(100, 140, 220, 0.30);
+
+  /* Texto */
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.35);
+
+  /* Accent */
+  --accent-blue: #4A90D9;
+  --accent-blue-light: #7AB3E8;
+
+  /* Status */
+  --status-success: #22C55E;
+  --status-failed: #EF4444;
+  --status-running: #F59E0B;
+  --status-skipped: #64748B;
+
+  /* Cards */
+  --card-radius: 20px;
+  --card-blur: blur(12px);
 }
 
 html,
@@ -40,16 +49,25 @@ body {
 }
 
 body {
-    margin: 0;
-    background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.08), transparent 30%),
-        radial-gradient(circle at top right, rgba(129, 140, 248, 0.08), transparent 28%),
-        var(--bg-base);
-    color: var(--text-primary);
-    font-family: "Absans", ui-sans-serif, system-ui, sans-serif;
+  margin: 0;
+  background-color: #000000;
+  background-image:
+    radial-gradient(
+      ellipse 80% 60% at 65% 20%,
+      rgba(40, 80, 140, 0.45) 0%,
+      rgba(20, 50, 100, 0.20) 40%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 70% at 85% 60%,
+      rgba(30, 60, 120, 0.30) 0%,
+      transparent 60%
+    );
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
 }
-
-.font-harmond { font-family: "Harmond", ui-sans-serif, sans-serif; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pop-in { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
@@ -58,4 +76,4 @@ body {
 a {
     color: inherit;
     text-decoration: none;
-}
+}

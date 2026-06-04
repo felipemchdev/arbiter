@@ -1,9 +1,7 @@
-import { Card } from "@/components/ui/card";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { LayoutDashboard, LineChart, Bell, ClipboardList } from "lucide-react";
+import { SidebarNav } from "@/components/sidebar-nav";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     const session = await getServerSession(authOptions);
@@ -11,36 +9,28 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         redirect("/login");
     }
 
-    const nav = [
-        { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-        { href: "/dashboard/pipelines", label: "Pipelines", icon: ClipboardList },
-        { href: "/dashboard/alerts", label: "Alerts", icon: Bell },
-    ];
-
     return (
-        <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
+        <div className="min-h-screen text-[var(--text-primary)] font-sans">
             <div className="grid min-h-screen grid-cols-[260px_1fr]">
-                <aside className="border-r border-[var(--border)] bg-[var(--bg-surface)] p-6">
+                <aside className="border-r border-[var(--border)] bg-[rgba(10,18,35,0.70)] backdrop-blur-[16px] p-6">
                     <div className="mb-8">
-                        <div className="text-xs uppercase tracking-[0.35em] text-[var(--text-muted)]">Arbiter</div>
-                        <div className="mt-2 text-2xl font-semibold">Observability</div>
+                        <div className="text-2xl font-display font-semibold">
+                            Arbiter<span className="align-super text-[0.52em] leading-none ml-[2px]">✳</span>
+                        </div>
                     </div>
-                    <nav className="space-y-2">
-                        {nav.map(({ href, label, icon: Icon }) => (
-                            <Link key={href} href={href} className="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-sm text-[var(--text-muted)] transition hover:border-[var(--border)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]">
-                                <Icon size={16} />
-                                {label}
-                            </Link>
-                        ))}
-                    </nav>
+                    <SidebarNav />
                 </aside>
-                <main className="p-8">
-                    <Card className="mb-8 border-[var(--border)] bg-[linear-gradient(135deg,rgba(56,189,248,0.08),rgba(129,140,248,0.04))] p-5">
-                        <div className="text-sm text-[var(--text-muted)]">Signed in</div>
-                        <div className="mt-1 text-lg font-medium">{session.user?.name || "Arbiter organization"}</div>
-                    </Card>
-                    {children}
-                </main>
+                <div className="flex flex-col min-h-screen">
+                    <header className="flex items-center px-8 py-4 bg-[rgba(0,0,0,0.40)] backdrop-blur-[12px] border-b border-[var(--border)]">
+                        <div>
+                            <div className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-display">Signed in as</div>
+                            <div className="mt-1 text-sm font-medium">{session.user?.name || "Arbiter organization"}</div>
+                        </div>
+                    </header>
+                    <main className="p-8 flex-1">
+                        {children}
+                    </main>
+                </div>
             </div>
         </div>
     );

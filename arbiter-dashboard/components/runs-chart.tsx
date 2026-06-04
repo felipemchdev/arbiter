@@ -16,18 +16,19 @@ export function RunsChart({ runsToday }: { runsToday: number }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(56,189,248,0.08)" />
-        <XAxis dataKey="day" tick={{ fill: "#475569", fontSize: 12 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "#475569", fontSize: 12 }} axisLine={false} tickLine={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+        <XAxis dataKey="day" tick={{ fill: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-sans, sans-serif)" }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fill: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-sans, sans-serif)" }} axisLine={false} tickLine={false} />
         <Tooltip
           contentStyle={{
-            background: "#0D0D18",
-            border: "1px solid rgba(56,189,248,0.15)",
+            background: "var(--bg-card)",
+            border: "1px solid var(--border)",
             borderRadius: "12px",
-            color: "#F1F5F9",
+            color: "var(--text-primary)",
+            backdropFilter: "var(--card-blur)",
           }}
         />
-        <Bar dataKey="runs" fill="#818CF8" radius={[6, 6, 0, 0]} barSize={32} />
+        <Bar dataKey="runs" fill="var(--accent-blue)" radius={[6, 6, 0, 0]} barSize={32} />
       </BarChart>
     </ResponsiveContainer>
   );

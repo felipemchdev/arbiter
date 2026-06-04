@@ -2,12 +2,15 @@ import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { SidebarNav } from "@/components/sidebar-nav";
+import { RoleBadge } from "@/components/role-badge";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     const session = await getServerSession(authOptions);
     if (!session?.accessToken) {
         redirect("/login");
     }
+
+    const role = (session as any).role ?? "viewer";
 
     return (
         <div className="min-h-screen text-[var(--text-primary)] font-sans">
@@ -22,9 +25,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
                 </aside>
                 <div className="flex flex-col min-h-screen">
                     <header className="flex items-center px-8 py-4 bg-[rgba(0,0,0,0.35)] backdrop-blur-[12px] border-b border-[var(--border)]">
-                        <div>
-                            <div className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-display">Pipeline Observability</div>
-                            <div className="mt-1 text-sm font-medium">{session.user?.name || "Arbiter organization"}</div>
+                        <div className="flex items-center gap-3">
+                            <RoleBadge role={role} />
+                            <div>
+                                <div className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-display">Pipeline Observability</div>
+                                <div className="mt-1 text-sm font-medium">{session.user?.name || "Arbiter"}</div>
+                            </div>
                         </div>
                     </header>
                     <main className="p-8 flex-1">

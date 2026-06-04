@@ -60,7 +60,9 @@ async function apiFetch<T>(path: string, token?: string, init: RequestInit = {})
     cache: "no-store",
   });
   if (!response.ok) {
-    return null
+    return null;
+  }
+  return response.json() as Promise<T>;
   } catch {
     return null;
   }

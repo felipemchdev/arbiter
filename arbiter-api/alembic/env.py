@@ -7,6 +7,13 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import os
+import sys
+
+if os.environ.get("ALEMBIC_ALLOW_DOWNGRADE") != "true" and any(arg.startswith("downgrade") for arg in sys.argv):
+    sys.stderr.write("DOWNGRADE REJECTED in production. Set ALEMBIC_ALLOW_DOWNGRADE=true to override.\n")
+    sys.exit(1)
+
 from app.core.config import settings
 from app.core.database import Base
 from app.models.alert import Alert

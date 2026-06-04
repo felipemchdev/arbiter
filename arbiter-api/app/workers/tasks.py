@@ -28,7 +28,7 @@ RETRY_DELAY = 60
 def process_run_event(self, run_id: str) -> None:
     async def _run() -> None:
         async with async_session_maker() as session:
-            result = await session.execute(select(PipelineRun).where(PipelineRun.id == run_id))
+            result = await session.execute(select(PipelineRun).where(PipelineRun.id == run_id).with_for_update())
             run = result.scalar_one_or_none()
             if run is None:
                 logger.warning("process_run_event_run_not_found run_id=%s", run_id)

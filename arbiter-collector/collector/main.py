@@ -10,6 +10,8 @@ from collector.sender import ArbiterSender
 
 INITIAL_BACKOFF = 10
 MAX_BACKOFF = 300
+CIRCUIT_BREAKER_THRESHOLD = 12
+CIRCUIT_BREAKER_RESET = 600
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -83,7 +85,18 @@ def run_loop(
     sender = ArbiterSender(arbiter_api, arbiter_key)
     logger.info("collector_started interval=%d", interval)
     failures = 0
+    circuit_open_since = None
     while True:
+        if circuit_open_since is not None:
+            if time.monotonic() - circuit_open_since < CIRCUIT_BREAKER_RESET:
+                logger.info("circuit_breaker_open cooldown_remaining=%ds", int(CIRCUIT_BREAKER_RESET - (time.monotonic() - circuit_open_since)))
+                time.sleep(CIRCUIT_BREAKER_RESET)
+                circuit_open_since = None
+                failures = 0
+                continue
+            circuit_open_since = None
+            failures = 0
+            logger.info("circuit_breaker_half_open")
         try:
             logger.info("collector_poll_start")
             payload = build_payload(airflow_client)
@@ -92,6 +105,10 @@ def run_loop(
                 failures = 0
             else:
                 failures += 1
+                if failures >= CIRCUIT_BREAKER_THRESHOLD:
+                    logger.error("circuit_breaker_opened failures=%d", failures)
+                    circuit_open_since = time.monotonic()
+                    continue
                 backoff = min(INITIAL_BACKOFF * (2 ** failures), MAX_BACKOFF)
                 logger.warning("collector_send_failed_backoff failures=%d backoff=%ds", failures, backoff)
                 time.sleep(backoff)
@@ -99,6 +116,10 @@ def run_loop(
         except Exception as exc:
             logger.warning("collector_poll_error error=%s", exc)
             failures += 1
+            if failures >= CIRCUIT_BREAKER_THRESHOLD:
+                logger.error("circuit_breaker_opened failures=%d", failures)
+                circuit_open_since = time.monotonic()
+                continue
             backoff = min(INITIAL_BACKOFF * (2 ** failures), MAX_BACKOFF)
             logger.warning("collector_backoff failures=%d backoff=%ds", failures, backoff)
             time.sleep(backoff)

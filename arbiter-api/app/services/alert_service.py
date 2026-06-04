@@ -28,9 +28,11 @@ async def create_alert(
     alert = Alert(pipeline_id=pipeline_id, run_id=run_id, type=alert_type, message=message, resolved=False)
     session.add(alert)
     try:
-        await session.flush()  # let the unique constraint fire before full commit
+        savepoint = await session.begin_nested()
+        await session.flush()
     except IntegrityError:
-        await session.rollback()
+        await savepoint.rollback()
+        session.expunge(alert)
         logger.debug(
             "alert_already_exists_skipped pipeline_id=%s type=%s",
             pipeline_id, alert_type.value,

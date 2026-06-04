@@ -1,23 +1,21 @@
-"use client";
-
-import { Badge } from "@/components/ui/badge";
 import type { PipelineSource } from "@/lib/types";
 
-export function SourceBadge({ source }: { source?: PipelineSource | string | null }) {
-  const value = (source || "sdk") as string;
-  const color =
-    value === "airflow"
-      ? "text-[var(--accent-blue)] border-[rgba(74,144,217,0.18)] bg-[rgba(74,144,217,0.08)]"
-      : value === "azure_function"
-        ? "text-[#9B59B6] border-[rgba(155,89,182,0.18)] bg-[rgba(155,89,182,0.08)]"
-        : "text-[var(--text-muted)] border-[rgba(255,255,255,0.18)] bg-[rgba(255,255,255,0.05)]";
+const sourceColors: Record<string, { color: string; bg: string }> = {
+  airflow:          { color: "#38BDF8", bg: "rgba(56,189,248,0.12)" },
+  azure_function:   { color: "#818CF8", bg: "rgba(129,140,248,0.12)" },
+  sdk:              { color: "#94A3B8", bg: "rgba(148,163,184,0.12)" },
+};
 
-  const label =
-    value === "airflow"
-      ? "Airflow"
-      : value === "azure_function"
-        ? "Azure Function"
-        : "SDK";
-
-  return <Badge className={color}>{label}</Badge>;
+export function SourceBadge({ source }: { source: PipelineSource | string | null }) {
+  const val = source || "sdk";
+  const c = sourceColors[val] || sourceColors["sdk"];
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      padding: "3px 9px", borderRadius: 6, fontSize: 12,
+      fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+      color: c.color, background: c.bg,
+      border: `1px solid ${c.color}22`, whiteSpace: "nowrap",
+    }}>{val}</span>
+  );
 }

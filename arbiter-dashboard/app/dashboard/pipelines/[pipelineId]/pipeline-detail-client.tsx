@@ -48,6 +48,7 @@ export default function PipelineDetailClient({
 
   const nodes = (pipeline.dag_definition?.nodes ?? []).map((n) => ({ ...n, status: tasks.find((t) => t.task_id === n.id)?.status ?? undefined }));
   const edges = pipeline.dag_definition?.edges ?? [];
+  const hasDag = pipeline.dag_definition != null && (pipeline.dag_definition.nodes?.length ?? 0) > 0;
   const taskDetails = tasks.map((t) => ({
     task_id: t.task_id,
     status: t.status,
@@ -71,7 +72,7 @@ export default function PipelineDetailClient({
       {tab === "Grafo" && (
         <Card>
           <CardContent className="p-0">
-            {pipeline.dag_definition ? (
+            {hasDag ? (
               <DagGraph nodes={nodes as any} edges={edges as any} tasks={taskDetails as any} />
             ) : (
               <div className="flex h-[400px] items-center justify-center text-sm text-[var(--text-muted)]">

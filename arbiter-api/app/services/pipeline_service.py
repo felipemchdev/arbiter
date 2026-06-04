@@ -74,5 +74,6 @@ async def upsert_dag_definition(session: AsyncSession, pipeline: Pipeline, nodes
         dag.edges = edges
         dag.updated_at = datetime.now(UTC)
     session.add(dag)
-    await session.flush()
+    # NOTE: no commit here — caller is responsible for committing the transaction.
+    # This function is intentionally a unit-of-work participant, not a transaction owner.
     return dag

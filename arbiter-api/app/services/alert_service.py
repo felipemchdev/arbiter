@@ -4,6 +4,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert, AlertType
@@ -21,23 +22,21 @@ async def create_alert(
     message: str,
     run_id=None,
 ) -> Alert | None:
-    existing = await session.execute(
-        select(Alert).where(
-            Alert.pipeline_id == pipeline_id,
-            Alert.type == alert_type,
-            Alert.resolved.is_(False),
-            Alert.run_id == run_id,
-            Alert.message == message,
-        )
-    )
-    if existing.scalar_one_or_none():
-        return None
-
+    # Do not use SELECT-then-INSERT: that check is not atomic under concurrent workers.
+    # The partial unique index (uq_active_alert) guarantees atomicity at the DB level.
+    # If two workers race, the second INSERT raises IntegrityError and we return None.
     alert = Alert(pipeline_id=pipeline_id, run_id=run_id, type=alert_type, message=message, resolved=False)
     session.add(alert)
-    await session.commit()
-    await session.refresh(alert)
-    logger.info("alert_created", extra={"alert_id": str(alert.id), "pipeline_id": str(pipeline_id), "type": alert_type.value})
+    try:
+        await session.flush()  # let the unique constraint fire before full commit
+    except IntegrityError:
+        await session.rollback()
+        logger.debug(
+            "alert_already_exists_skipped pipeline_id=%s type=%s",
+            pipeline_id, alert_type.value,
+        )
+        return None
+    logger.info("alert_created", extra={"pipeline_id": str(pipeline_id), "type": alert_type.value})
     return alert
 
 

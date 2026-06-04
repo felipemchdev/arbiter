@@ -6,20 +6,27 @@ export function RunTimeline({ tasks }: { tasks: TaskInstance[] }) {
     const last = tasks.at(-1)?.finished_at ? new Date(tasks.at(-1)?.finished_at || "").getTime() : Date.now();
     const total = Math.max(last - first, 1);
 
+    const getStatusColor = (status: string) => {
+        if (status === "success") return "bg-[var(--status-success)]";
+        if (status === "failed") return "bg-[var(--status-failed)]";
+        if (status === "running") return "bg-[var(--status-running)]";
+        return "bg-[var(--status-skipped)]";
+    };
+
     return (
         <Card>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4 p-6">
                 {tasks.map((task) => {
                     const start = new Date(task.started_at).getTime();
                     const finish = task.finished_at ? new Date(task.finished_at).getTime() : start + (task.duration_ms ?? 0);
                     const left = ((start - first) / total) * 100;
-                    const width = Math.max(((finish - start) / total) * 100, 3);
+                    const width = Math.max(((finish - start) / total) * 100, 1);
                     return (
-                        <div key={task.id} className="grid grid-cols-[160px_1fr_120px] items-center gap-3 text-sm">
-                            <div className="text-[var(--text-primary)]">{task.task_id}</div>
-                            <div className="relative h-4 rounded-full bg-[#111120]">
+                        <div key={task.id} className="grid grid-cols-[160px_1fr_120px] items-center gap-4 text-sm font-sans">
+                            <div className="text-[var(--text-primary)] font-medium truncate" title={task.task_id}>{task.task_id}</div>
+                            <div className="relative h-[20px] rounded-[6px] bg-[rgba(10,18,40,0.40)]">
                                 <div
-                                    className="absolute h-4 rounded-full bg-gradient-to-r from-[var(--accent-blue)] to-[var(--accent-purple)]"
+                                    className={`absolute h-full rounded-[6px] ${getStatusColor(task.status)} opacity-80 hover:opacity-100 transition-opacity`}
                                     style={{ left: `${left}%`, width: `${width}%` }}
                                 />
                             </div>

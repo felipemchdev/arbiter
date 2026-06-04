@@ -26,15 +26,19 @@ async def get_current_org(
         token = authorization.split(" ", 1)[1]
         try:
             payload = decode_access_token(token)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
-        org_id = payload.get("sub")
+
+        org_id = payload.get("org_id") or payload.get("sub")
         if org_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token payload")
+
         result = await db.execute(select(Organization).where(Organization.id == UUID(org_id)))
         organization = result.scalar_one_or_none()
         if organization is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="organization not found")
+
+        organization._role = payload.get("role", "viewer")
         return organization
 
     if x_api_key:
@@ -42,6 +46,7 @@ async def get_current_org(
         result = await db.execute(select(Organization).where(Organization.api_key == hashed_api_key))
         organization = result.scalar_one_or_none()
         if organization is not None:
+            organization._role = "owner"
             return organization
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid api key")
 

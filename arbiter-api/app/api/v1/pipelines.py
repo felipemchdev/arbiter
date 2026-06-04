@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
+from app.api.role_guard import require_owner
 from app.schemas.pipeline import DagDefinitionRead, PipelineCreate, PipelineDetail, PipelineRead, PipelineRunSummary
 from app.services.pipeline_service import create_pipeline, get_pipeline, get_pipeline_runs, list_pipelines
 
@@ -21,7 +22,7 @@ async def read_pipelines(
 @router.post("", response_model=PipelineRead, status_code=status.HTTP_201_CREATED)
 async def create_pipeline_endpoint(
     payload: PipelineCreate,
-    current_org=Depends(get_current_org),
+    current_org=Depends(require_owner),
     db: AsyncSession = Depends(get_db),
 ):
     return await create_pipeline(db, current_org.id, payload)

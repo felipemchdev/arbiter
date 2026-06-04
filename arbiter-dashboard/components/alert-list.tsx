@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { resolveAlert } from "@/lib/api";
 import type { Alert } from "@/lib/types";
+import { useIsOwner } from "@/lib/useRole";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 export function AlertList({ alerts, token }: { alerts: Alert[]; token?: string }) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
+    const isOwner = useIsOwner();
 
     const getBorderColor = (type: string) => {
         if (type === "failure") return "border-l-[4px] border-l-[var(--status-failed)]";
@@ -24,21 +26,23 @@ export function AlertList({ alerts, token }: { alerts: Alert[]; token?: string }
                 <Card key={alert.id} className={getBorderColor(alert.type)}>
                     <CardContent className="flex items-center justify-between gap-4 p-4">
                         <div>
-                            <div className="font-medium font-sans text-[var(--text-primary)] capitalize">{alert.type.replace('_', ' ')}</div>
+                            <div className="font-medium font-sans text-[var(--text-primary)] capitalize">{alert.type.replace("_", " ")}</div>
                             <div className="mt-1 text-sm text-[var(--text-muted)] font-sans">{alert.message}</div>
                         </div>
-                        <Button
-                            className="bg-transparent border border-[var(--border)] text-[var(--text-primary)] rounded-[10px] hover:bg-[var(--bg-surface)] hover:text-white transition"
-                            disabled={pending}
-                            onClick={() =>
-                                startTransition(async () => {
-                                    await resolveAlert(alert.id, token);
-                                    router.refresh();
-                                })
-                            }
-                        >
-                            Resolver
-                        </Button>
+                        {isOwner && (
+                            <Button
+                                className="bg-transparent border border-[var(--border)] text-[var(--text-primary)] rounded-[10px] hover:bg-[var(--bg-surface)] hover:text-white transition"
+                                disabled={pending}
+                                onClick={() =>
+                                    startTransition(async () => {
+                                        await resolveAlert(alert.id, token);
+                                        router.refresh();
+                                    })
+                                }
+                            >
+                                Resolver
+                            </Button>
+                        )}
                     </CardContent>
                 </Card>
             ))}

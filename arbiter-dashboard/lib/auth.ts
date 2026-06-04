@@ -11,8 +11,8 @@ export const authOptions: NextAuthOptions = {
         CredentialsProvider({
             name: "Arbiter",
             credentials: {
-                username: { label: "Organization", type: "text" },
-                password: { label: "API Key", type: "password" },
+                username: { label: "Email", type: "text", placeholder: "user" },
+                password: { label: "Password", type: "password", placeholder: "password" },
             },
             async authorize(credentials) {
                 const response = await fetch(`${API_URL}/api/v1/auth/token`, {
@@ -27,15 +27,13 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
                 const data = (await response.json()) as { access_token: string };
-                // Decode backend JWT to extract the real expiry so we can detect
-                // token expiration on subsequent requests without an extra round-trip.
-                const decoded = jwtDecode<{ exp: number }>(data.access_token);
+                const decoded = jwtDecode<{ exp: number; role: string }>(data.access_token);
                 return {
-                    id: credentials?.username || "org",
+                    id: credentials?.username || "user",
                     name: credentials?.username || "Arbiter",
                     accessToken: data.access_token,
-                    accessTokenExpires: decoded.exp * 1000, // ms
-                    orgId: credentials?.username || "org",
+                    accessTokenExpires: decoded.exp * 1000,
+                    role: decoded.role,
                 };
             },
         }),
@@ -45,9 +43,8 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 token.accessToken = (user as any).accessToken;
                 token.accessTokenExpires = (user as any).accessTokenExpires;
-                token.orgId = (user as any).orgId;
+                token.role = (user as any).role;
             }
-            // Flag the token as expired so pages/components can react appropriately.
             if (Date.now() > (token.accessTokenExpires as number ?? 0)) {
                 token.error = "AccessTokenExpired";
             }
@@ -55,8 +52,8 @@ export const authOptions: NextAuthOptions = {
         },
         async session({ session, token }) {
             (session as any).accessToken = token.accessToken;
-            (session as any).orgId = token.orgId;
-            (session as any).error = token.error;  // forward to client
+            (session as any).role = token.role;
+            (session as any).error = token.error;
             return session;
         },
     },

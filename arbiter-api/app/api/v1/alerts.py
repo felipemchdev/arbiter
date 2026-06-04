@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
-from app.models.alert import Alert
+from app.api.role_guard import require_owner
 from app.schemas.alert import AlertRead, AlertResolveResponse
 from app.services.alert_service import resolve_alert
 from app.repositories.alert_repo import AlertRepository
@@ -24,7 +24,7 @@ async def read_alerts(
 @router.put("/{alert_id}/resolve", response_model=AlertResolveResponse)
 async def resolve_alert_endpoint(
     alert_id: str,
-    current_org=Depends(get_current_org),
+    current_org=Depends(require_owner),
     db: AsyncSession = Depends(get_db),
 ):
     repository = AlertRepository(db)

@@ -54,6 +54,8 @@ export interface TaskInstance {
   try_number: number;
   log_url?: string | null;
   error_message?: string | null;
+  log_output?: string | null;
+  input_params?: string | null;
 }
 
 export interface Alert {

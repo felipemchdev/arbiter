@@ -34,7 +34,7 @@ class RunPayload(BaseModel):
 class RunRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
-    pipeline_id: UUKD
+    pipeline_id: UUID
     run_id: str
     status: RunStatus
     started_at: datetime

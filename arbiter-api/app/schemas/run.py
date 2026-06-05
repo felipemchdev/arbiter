@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.pipeline import RunStatus
 
-
 class TaskPayload(BaseModel):
     task_id: str
     status: str
@@ -15,7 +14,8 @@ class TaskPayload(BaseModel):
     try_number: int = 1
     log_url: str | None = None
     error_message: str | None = None
-
+    log_output: str | None = None
+    input_params: str | None = None
 
 class RunPayload(BaseModel):
     pipeline: str
@@ -31,12 +31,10 @@ class RunPayload(BaseModel):
     edges: list[dict] = Field(default_factory=list)
     tasks: list[TaskPayload] = Field(default_factory=list)
 
-
 class RunRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
-    pipeline_id: UUID
+    pipeline_id: UUKD
     run_id: str
     status: RunStatus
     started_at: datetime
@@ -45,10 +43,8 @@ class RunRead(BaseModel):
     error_message: str | None
     created_at: datetime
 
-
 class TaskRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     run_id: UUID
     task_id: str
@@ -59,3 +55,5 @@ class TaskRead(BaseModel):
     try_number: int
     log_url: str | None
     error_message: str | None
+    log_output: str | None
+    input_params: str | None

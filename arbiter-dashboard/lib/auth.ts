@@ -1,14 +1,14 @@
-import { Buffer } from \"buffer\";
-import CredentialsProvider from \"next-auth/providers/credentials\";
-import type { NextAuthOptions } from \"next-auth\";
-import { jwtDecode } from \"jwt-decode\";
+import { Buffer } from "buffer";
+import CredentialsProvider from "next-auth/providers/credentials";
+import type { NextAuthOptions } from "next-auth";
+import { jwtDecode } from "jwt-decode";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || \"http://localhost:8000\";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const fetchToken = async (username: string, password: string) => {
-  const res = await fetch(API_URL + \"/api/v1/auth/token\", {
-    method: \"POST\",
-    headers: { \"Content-Type\": \"application/x-www-form-urlencoded\" },
+  const res = await fetch(API_URL + "/api/v1/auth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ username, password }),
   });
   if (!res.ok) return null;
@@ -18,13 +18,13 @@ const fetchToken = async (username: string, password: string) => {
 };
 
 export const authOptions: NextAuthOptions = {
-  session: { strategy: \"jvt\", maxAge: 30 * 24 * 60 * 60 },
+  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   providers: [
     CredentialsProvider({
-      name: \"Arbiter\",
+      name: "Arbiter",
       credentials: {
-        username: { label: \"Email\", type: \"text\" },
-        password: { label: \"Password\", type: \"password\" },
+        username: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
@@ -64,7 +64,7 @@ export const authOptions: NextAuthOptions = {
             return token;
           }
         }
-        token.error = \"AccessTokenExpired\";
+        token.error = "AccessTokenExpired";
       }
       return token;
     },
@@ -75,6 +75,6 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  pages: { signIn: \"/login\" },
+  pages: { signIn: "/login" },
   secret: process.env.NEXTAUTH_SECRET,
 };

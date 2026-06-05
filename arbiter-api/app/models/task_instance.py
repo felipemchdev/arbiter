@@ -31,5 +31,7 @@ class TaskInstance(Base):
     try_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     log_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    log_output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_params: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     run: Mapped["PipelineRun"] = relationship(back_populates="task_instances")

@@ -1,8 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, cast, Date, func, select, text
-from sqlalchemy.sql.expression import when
+from sqlalchemy import case, cast, Date, func, select, text, when
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db

@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import cast, Date, func, select, text
+from sqlalchemy import cast, case, Date, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
@@ -83,7 +83,7 @@ async def runs_per_day(
             cast(PipelineRun.started_at, Date).label("day"),
             func.count(PipelineRun.id).label("count"),
             func.sum(
-                func.case(
+                case(
                     (PipelineRun.status == RunStatus.failed, 1),
                     else_=0,
                 )

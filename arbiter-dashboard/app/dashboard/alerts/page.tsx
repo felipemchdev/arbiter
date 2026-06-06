@@ -1,7 +1,6 @@
 "use client";
 
 import { AlertList } from "@/components/alert-list";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { getAlerts } from "@/lib/api";
@@ -11,7 +10,7 @@ export default function AlertsPage() {
   const { data: session } = useSession();
   const token = session?.accessToken;
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<string>("All");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,46 +22,47 @@ export default function AlertsPage() {
     }
   }, [token]);
 
-  const filtered = filter === "all" ? alerts : alerts.filter((a) => a.type === filter);
+  const filtered = filter === "All" ? alerts : alerts.filter((a) => a.type === filter);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold font-display text-[var(--text-primary)]">Alerts</h1>
+      <div className="animate-fade-in">
+        <h1 style={{
+          fontFamily: "'Pragmatica Extended', 'DM Sans', sans-serif",
+          fontWeight: 700, fontSize: 22,
+          color: 'var(--text)', letterSpacing: '-0.3px',
+          marginBottom: 4,
+        }}>Alerts</h1>
       </div>
 
-      <div className="flex gap-6 border-b border-[var(--border)] w-full">
-        {["all", "failure", "duration_exceeded", "no_run"].map((type) => (
-          <button
-            key={type}
-            onClick={() => setFilter(type)}
-            className={`px-1 py-3 text-sm font-medium capitalize transition font-sans ${
-              filter === type
-                ? "border-b-2 border-[var(--accent-blue)] text-[var(--accent-blue)]"
-                : "border-b-2 border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)]"
-            }`}
-          >
-            {type === "all" ? "All" : type.replace("_", " ")}
-          </button>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+        {['All', 'failure', 'no_run', 'duration_exceeded'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} style={{
+            padding: '5px 14px', borderRadius: 'var(--r-pill)',
+            fontSize: 12, fontWeight: 500,
+            fontFamily: "'DM Sans', sans-serif",
+            background: filter === f ? 'var(--accent-muted)' : 'var(--bg-surface)',
+            border: `1px solid ${filter === f ? 'var(--border-accent)' : 'var(--border)'}`,
+            color: filter === f ? 'var(--accent)' : 'var(--text-muted)',
+            transition: 'all var(--duration-fast) var(--ease)',
+            cursor: 'pointer',
+          }}>{f === 'All' ? 'All' : f.replace('_', ' ')}</button>
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="text-lg font-semibold font-display text-[var(--text-primary)]">{filtered.length} alerts</div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--accent-blue)]" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-8 text-center text-sm text-[var(--text-muted)] font-sans">No alerts found.</div>
-          ) : (
-            <AlertList alerts={filtered} token={token} />
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0' }}>
+          <div style={{ width: 20, height: 20, border: '2px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+          No alerts found.
+        </div>
+      ) : (
+        <div className="animate-slide-up">
+          <AlertList alerts={filtered} token={token} />
+        </div>
+      )}
     </div>
   );
 }

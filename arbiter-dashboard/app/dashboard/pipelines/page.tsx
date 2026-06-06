@@ -1,8 +1,6 @@
 import { StatusBadge } from "@/components/status-badge";
 import { SourceBadge } from "@/components/source-badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button-arbiter";
 import { authOptions } from "@/lib/auth";
 import { getPipelines } from "@/lib/api";
 import { getServerSession } from "next-auth";
@@ -14,57 +12,78 @@ export default async function PipelinesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold font-display text-[var(--text-primary)]">Pipelines</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">{pipelines.length} pipelines found</p>
+      <div className="animate-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h1 style={{
+            fontFamily: "'Pragmatica Extended', 'DM Sans', sans-serif",
+            fontWeight: 700, fontSize: 22,
+            color: 'var(--text)', letterSpacing: '-0.3px',
+            marginBottom: 4,
+          }}>Pipelines</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            {pipelines.length} pipelines monitored
+          </p>
+        </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeader>Name</TableHeader>
-                <TableHeader>Source</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Last Run</TableHeader>
-                <TableHeader>Action</TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {pipelines.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-[var(--text-muted)] py-8">
-                    No pipelines found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                pipelines.map((pipeline) => (
-                  <TableRow key={pipeline.id}>
-                    <TableCell className="font-medium">{pipeline.name}</TableCell>
-                    <TableCell>
-                      <SourceBadge source={pipeline.source} />
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={pipeline.last_run_status} />
-                    </TableCell>
-                    <TableCell className="text-[var(--text-muted)]">
-                      {pipeline.last_run_at
-                        ? new Date(pipeline.last_run_at).toLocaleString()
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/dashboard/pipelines/${pipeline.id}`}>
-                        <Button>Ver</Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <div className="animate-fade-in" style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--r-lg)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '2fr 1fr 1fr 1fr 80px',
+          padding: '10px 20px',
+          background: 'var(--bg-surface)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: 11, fontWeight: 600,
+          color: 'var(--text-muted)',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+        }}>
+          <span>Pipeline</span>
+          <span>Source</span>
+          <span>Status</span>
+          <span>Last run</span>
+          <span></span>
+        </div>
+
+        {pipelines.length === 0 ? (
+          <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            No pipelines found.
+          </div>
+        ) : (
+          pipelines.map(p => (
+            <div key={p.id} style={{
+              display: 'grid',
+              gridTemplateColumns: '2fr 1fr 1fr 1fr 80px',
+              padding: '14px 20px',
+              borderBottom: '1px solid var(--border)',
+              alignItems: 'center',
+              transition: 'background var(--duration-fast) var(--ease)',
+            }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
+                  {p.name}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                  {p.id.slice(0, 8)}...
+                </div>
+              </div>
+              <SourceBadge source={p.source} />
+              <StatusBadge status={p.last_run_status} />
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {p.last_run_at ? new Date(p.last_run_at).toLocaleString() : '—'}
+              </div>
+              <Link href={`/dashboard/pipelines/${p.id}`}>
+                <Button>View</Button>
+              </Link>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -1,34 +1,53 @@
-"use client";
+'use client'
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
-export function RunsChart({ runsToday }: { runsToday: number }) {
-  const data = useMemo(
-    () =>
-      Array.from({ length: 7 }).map((_, index) => ({
-        day: `D-${6 - index}`,
-        runs: Math.max(runsToday - index * Math.ceil(runsToday / 7 || 1), 0),
-      })),
-    [runsToday],
-  );
+interface RunsPerDay {
+  date: string
+  label: string
+  count: number
+  failed: number
+}
+
+export function RunsChart({ data }: { data: RunsPerDay[] }) {
+  if (!data?.length) return (
+    <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>No runs in the last 7 days</span>
+    </div>
+  )
 
   return (
-    <ResponsiveContainer width="100%" height={260}>
-      <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-        <XAxis dataKey="day" tick={{ fill: "var(--text-muted)", fontSize: 12 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "var(--text-muted)", fontSize: 12 }} axisLine={false} tickLine={false} />
+    <ResponsiveContainer width="100%" height={160}>
+      <BarChart data={data} barGap={2} barCategoryGap="30%">
+        <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+        <XAxis
+          dataKey="label"
+          tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'DM Sans' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fill: 'var(--text-muted)', fontSize: 11, fontFamily: 'DM Sans' }}
+          axisLine={false}
+          tickLine={false}
+          width={28}
+          allowDecimals={false}
+        />
         <Tooltip
           contentStyle={{
-            background: "var(--bg-card)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--r-lg)",
-            color: "var(--text)",
+            background: 'var(--bg-overlay)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            fontSize: 12,
+            fontFamily: 'DM Sans',
+            color: 'var(--text)',
           }}
+          cursor={{ fill: 'var(--bg-surface)' }}
+          formatter={(value: number, name: string) => [value, name === 'count' ? 'Runs' : 'Failed']}
         />
-        <Bar dataKey="runs" fill="var(--accent)" radius={[6, 6, 0, 0]} barSize={32} />
+        <Bar dataKey="count" fill="var(--accent)" radius={[4,4,0,0]} opacity={0.85} />
+        <Bar dataKey="failed" fill="var(--failed)" radius={[4,4,0,0]} opacity={0.55} />
       </BarChart>
     </ResponsiveContainer>
-  );
+  )
 }

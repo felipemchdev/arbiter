@@ -1,7 +1,7 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import select, text
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import cast, Date, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
@@ -69,3 +69,44 @@ async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depen
         "active_pipelines": active_pipelines,
         "avg_duration_ms": float(avg_row.avg_duration or 0) if avg_row else 0,
     }
+
+
+@router.get("/metrics/runs-per-day")
+async def runs_per_day(
+    days: int = Query(default=7, ge=1, le=90),
+    current_org=Depends(get_current_org),
+    db: AsyncSession = Depends(get_db),
+):
+    since = datetime.now(UTC) - timedelta(days=days)
+
+    result = await db.execute(
+        select(
+            cast(PipelineRun.started_at, Date).label("day"),
+            func.count(PipelineRun.id).label("count"),
+            func.sum(
+                func.case((PipelineRun.status == "failed", 1), else_=0)
+            ).label("failed"),
+        )
+        .join(Pipeline, PipelineRun.pipeline_id == Pipeline.id)
+        .where(
+            Pipeline.org_id == current_org.id,
+            PipelineRun.started_at >= since,
+        )
+        .group_by(cast(PipelineRun.started_at, Date))
+        .order_by(cast(PipelineRun.started_at, Date).asc())
+    )
+    rows = result.all()
+
+    row_map = {row.day: {"count": row.count, "failed": row.failed} for row in rows}
+    output = []
+    for i in range(days):
+        d = (datetime.now(UTC) - timedelta(days=days - 1 - i)).date()
+        output.append({
+            "date": d.isoformat(),
+            "label": d.strftime("%b %d"),
+            "count": row_map.get(d, {}).get("count", 0),
+            "failed": row_map.get(d, {}).get("failed", 0),
+        })
+
+    return {"data": output, "days": days}
+

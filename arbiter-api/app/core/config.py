@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     def model_post_init(self, __context) -> None:
         if self.secret_key == "change-me-in-production":

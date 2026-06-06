@@ -1,34 +1,41 @@
-import type { Config } from "tailwindcss";
+import type { Config } from 'tailwindcss'
 
-export default {
-    darkMode: ["class"],
-    content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
-    theme: {
-        extend: {
-            fontFamily: {
-                sans: ['DM Sans', 'sans-serif'],
-                display: ['Pragmatica Extended', 'Inter', 'sans-serif'],
-            },
-            colors: {
-                base: "var(--bg-base)",
-                surface: "var(--bg-surface)",
-                card: "var(--bg-card)",
-                border: "var(--border)",
-                borderHover: "var(--border-hover)",
-                accentBlue: "var(--accent-blue)",
-                accentBlueLight: "var(--accent-blue-light)",
-                textPrimary: "var(--text-primary)",
-                textSecondary: "var(--text-secondary)",
-                textMuted: "var(--text-muted)",
-                statusSuccess: "var(--status-success)",
-                statusFailed: "var(--status-failed)",
-                statusRunning: "var(--status-running)",
-                statusSkipped: "var(--status-skipped)",
-            },
-            boxShadow: {
-                glow: "0 0 0 1px rgba(56, 189, 248, 0.08), 0 20px 60px rgba(0, 0, 0, 0.35)",
-            },
+const config: Config = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  darkMode: ['class', '[data-theme="dark"]'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['DM Sans', 'sans-serif'],
+        display: ['Pragmatica Extended', 'DM Sans', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      colors: {
+        accent: '#C7FF8F',
+        'accent-hover': '#B8F07A',
+        cotton: '#FFFBF6',
+        arbiter: {
+          bg: '#0C0C0C',
+          surface: 'rgba(255,255,255,0.04)',
+          border: 'rgba(255,255,255,0.08)',
         },
+      },
+      borderRadius: {
+        sm: '6px',
+        md: '10px',
+        lg: '16px',
+        xl: '22px',
+      },
+      transitionTimingFunction: {
+        spring: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
     },
-    plugins: [],
-} satisfies Config;
+  },
+  plugins: [],
+}
+
+export default config

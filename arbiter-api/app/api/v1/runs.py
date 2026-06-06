@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
 from app.schemas.run import RunPayload, RunRead, TaskRead
+from app.schemas.collector import AirflowSyncPayload
 from app.services.run_service import get_run, ingest_run, list_tasks
 
 router = APIRouter()
@@ -15,6 +16,38 @@ async def ingest_run_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     return await ingest_run(db, current_org.id, payload)
+
+
+@router.post("/ingest")
+async def ingest_batch(
+    payload: AirflowSyncPayload,
+    current_org=Depends(get_current_org),
+    db: AsyncSession = Depends(get_db),
+):
+    ingested = 0
+    for dag in payload.dags:
+        for run in dag.runs:
+            await ingest_run(
+                db,
+                current_org.id,
+                RunPayload(
+                    pipeline=dag.name,
+                    source="airflow",
+                    run_id=run.run_id,
+                    status=run.status,
+                    started_at=run.started_at,
+                    finished_at=run.finished_at,
+                    duration_ms=run.duration_ms,
+                    error_message=run.error_message,
+                    dag_id=dag.dag_id,
+                    nodes=dag.nodes,
+                    edges=dag.edges,
+                    tasks=run.tasks,
+                ),
+            )
+            ingested += 1
+    await db.commit()
+    return {"ingested": ingested}
 
 
 @router.get("/{run_id}", response_model=RunRead)

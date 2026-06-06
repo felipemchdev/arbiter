@@ -1,8 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, cast, Date, func, select, text
-from sqlalchemy.sql.expression import when
+from sqlalchemy import cast, Date, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
@@ -31,7 +30,6 @@ async def health(db: AsyncSession = Depends(get_db)):
 @router.get("/metrics")
 async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depends(get_db)):
     today = datetime.now(UTC).date()
-    from sqlalchemy import func
     count_result = await db.execute(
         select(func.count()).select_from(Pipeline)
         .where(Pipeline.org_id == current_org.id, Pipeline.last_run_status != RunStatus.failed)
@@ -81,20 +79,19 @@ async def runs_per_day(
     since = datetime.now(UTC) - timedelta(days=days)
 
     result = await db.execute(
-        select(
-            cast(PipelineRun.started_at, Date).label("day"),
-            func.count(PipelineRun.id).label("count"),
-            func.sum(
-                case(when(PipelineRun.status == RunStatus.failed, 1), else_=0)
-            ).label("failed"),
-        )
-        .join(Pipeline, PipelineRun.pipeline_id == Pipeline.id)
-        .where(
-            Pipeline.org_id == current_org.id,
-            PipelineRun.started_at >= since,
-        )
-        .group_by(cast(PipelineRun.started_at, Date))
-        .order_by(cast(PipelineRun.started_at, Date).asc())
+        text(
+            """
+            SELECT DATE(pr.started_at) AS day,
+                   COUNT(pr.id) AS count,
+                   SUM(CASE WHEN pr.status = 'failed' THEN 1 ELSE 0 END) AS failed
+            FROM pipeline_runs pr
+            JOIN pipelines p ON p.id = pr.pipeline_id
+            WHERE p.org_id = :org_id AND pr.started_at >= :since
+            GROUP BY DATE(pr.started_at)
+            ORDER BY DATE(pr.started_at) ASC
+            """
+        ),
+        {"org_id": str(current_org.id), "since": since},
     )
     rows = result.all()
 

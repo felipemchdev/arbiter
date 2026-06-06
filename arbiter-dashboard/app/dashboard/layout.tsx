@@ -1,45 +1,124 @@
-import { authOptions } from "@/lib/auth";
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { SidebarNav } from "@/components/sidebar-nav";
-import { RoleBadge } from "@/components/role-badge";
-import { LogoutButton } from "@/components/logout-button";
+'use client'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
+import { ReactNode, useEffect, useState } from 'react'
+import { ArbiterLogo } from '@/components/logo/logo'
+import { PageTransition } from '@/components/page-transition'
+import { ThemeToggle } from '@/components/theme-toggle'
 
-export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-    const session = await getServerSession(authOptions);
-    if (!session?.accessToken) {
-        redirect("/login");
-    }
+const NAV_ITEMS = [
+  { href: '/dashboard',            label: 'Overview'  },
+  { href: '/dashboard/pipelines',  label: 'Pipelines' },
+  { href: '/dashboard/alerts',     label: 'Alerts'    },
+]
 
-    const role = (session as any).role ?? "viewer";
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const { data: session } = useSession()
+  const role = (session as any)?.role ?? 'viewer'
+  const [scrolled, setScrolled] = useState(false)
 
-    return (
-        <div className="min-h-screen text-[var--text-primary] font-sans">
-            <div className="grid min-h-screen grid-cols-[220px_1fr]">
-                <aside className="border-r border-[var--border] bg-[rgba(8,14,30,0.75)] backdrop-blur-[16px] px-0 py-7">
-                    <div className="mb-8">
-                        <div className="text-xl font-display font-bold">
-                            Arbiter<span className="align-super text-[0.52em] leading-none ml-[2px]">☳</span>
-                        </div>
-                    </div>
-                    <SidebarNav />
-                </aside>
-                <div className="flex flex-col min-h-screen">
-                    <header className="flex items-center justify-between px-8 py-4 bg-[rgba(0,0,0,0.35)] backdrop-blur-[12px] border-b border-[var--border]">
-                        <div className="flex items-center gap-3">
-                            <RoleBadge role={role} />
-                            <div>
-                                <div className="text-xs uppercase tracking-wider text-[var--text-muted] font-display">Pipeline Observability</div>
-                                <div className="mt-1 text-sm font-medium">{session.user?.name || "Aiarder"}</div>
-                            </div>
-                        </div>
-                        <LogoutButton />
-                    </header>
-                    <main className="p-8 flex-1">
-                        {children}
-                    </main>
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        height: 52,
+        background: scrolled ? 'var(--bg-overlay)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(16px)' : 'none',
+        borderBottom: `1px solid ${scrolled ? 'var(--border)' : 'transparent'}`,
+        transition: 'all var(--duration-base) var(--ease)',
+        display: 'flex', alignItems: 'center',
+        padding: '0 24px',
+        gap: 32,
+      }}>
+
+        <Link href="/dashboard" style={{ textDecoration: 'none', flexShrink: 0 }}>
+          <ArbiterLogo size="md" />
+        </Link>
+
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+          {NAV_ITEMS.map(({ href, label }) => {
+            const active = href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(href)
+            return (
+              <Link key={href} href={href} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  padding: '5px 12px',
+                  borderRadius: 'var(--r-md)',
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                  color: active ? 'var(--text)' : 'var(--text-muted)',
+                  background: active ? 'var(--bg-surface-hover)' : 'transparent',
+                  border: active ? '1px solid var(--border)' : '1px solid transparent',
+                  transition: 'all var(--duration-fast) var(--ease)',
+                  letterSpacing: '0.01em',
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
+                    ;(e.currentTarget as HTMLElement).style.background = 'var(--bg-surface)'
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    ;(e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+                    ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                  }
+                }}>
+                  {label}
                 </div>
-            </div>
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+
+          {role === 'viewer' && (
+            <span style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-sm)',
+              padding: '3px 8px',
+            }}>
+              View only
+            </span>
+          )}
+
+          <ThemeToggle />
+
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            style={{
+              background: 'transparent', border: 'none',
+              color: 'var(--text-muted)', fontSize: 12,
+              fontFamily: "'DM Sans', sans-serif",
+              padding: '5px 10px', borderRadius: 'var(--r-md)',
+              transition: 'color var(--duration-fast) var(--ease)',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+          >
+            sign out
+          </button>
         </div>
-    );
+      </header>
+
+      <main style={{ padding: '32px 24px', maxWidth: 1280, margin: '0 auto' }}>
+        <PageTransition>{children}</PageTransition>
+      </main>
+
+    </div>
+  )
 }

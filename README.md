@@ -8,7 +8,7 @@ Arbiter is a lightweight observability layer for data pipelines. It does not orc
 
 ```
                    POST /api/v1/runs/ingest
-                   POST /api/v1/collector/airflow/sync
+                   POST /api/v1/runs/ingest
 ┌──────────────┐  ──────────────────────────────►  ┌──────────────┐
 │  Airflow     │                                    │              │
 │  Azure Func  │                                    │  arbiter-api │
@@ -68,7 +68,7 @@ cp .env.example .env
 docker compose up -d
 
 # 4. Access
-# Dashboard:  http://localhost:3000  (login: admin@arbiter / @Camis#1)
+# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -77,7 +77,7 @@ docker compose up -d
 
 ```sh
 # Get API key from the seed output or check the API logs
-curl -X POST http://localhost:8000/api/v1/collector/airflow/sync \
+curl -X POST http://localhost:8000/api/v1/runs/ingest \
   -H "X-API-Key: arb_xxx" \
   -H "Content-Type: application/json" \
   -d '{

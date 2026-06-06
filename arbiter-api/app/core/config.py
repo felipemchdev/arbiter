@@ -30,7 +30,7 @@ class Settings(BaseSettings):
             normalized = []
             for item in v:
                 if not isinstance(item, str):
-                    raise TypeError(f"All CORS origins must be strings, got {type(item)}")
+                    raise ValueError(f"All CORS origins must be strings, got {type(item)}")
                 stripped = item.strip()
                 if stripped:
                     normalized.append(stripped)

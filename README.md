@@ -2,8 +2,6 @@
 
 [Português](#pt-br) · [English](#en)
 
-Pipeline observability - push events, get a dashboard.  
-Observabilidade de pipelines - envie eventos, tenha um dashboard.
 
 ---
 

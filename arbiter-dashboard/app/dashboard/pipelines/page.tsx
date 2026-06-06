@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/status-badge";
 import { SourceBadge } from "@/components/source-badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button-arbiter";
 import { authOptions } from "@/lib/auth";
 import { getPipelines } from "@/lib/api";
 import { getServerSession } from "next-auth";
@@ -63,9 +63,7 @@ export default async function PipelinesPage() {
               borderBottom: '1px solid var(--border)',
               alignItems: 'center',
               transition: 'background var(--duration-fast) var(--ease)',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
                   {p.name}

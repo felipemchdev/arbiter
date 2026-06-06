@@ -43,14 +43,6 @@ export default async function DashboardPage() {
             borderRadius: 'var(--r-lg)',
             padding: '18px 20px',
             transition: 'all var(--duration-base) var(--ease)',
-          }}
-          onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.background = 'var(--bg-card-hover)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)'
-          }}
-          onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.background = 'var(--bg-card)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
           }}>
             <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>
               {label}

@@ -1,9 +1,10 @@
+'use client'
 import { ArbiterSymbol } from "./symbol"
+import { useEffect, useState } from "react"
 
 interface LogoProps {
   variant?: "symbol-only" | "symbol-name" | "full"
   size?: "sm" | "md" | "lg"
-  theme?: "dark" | "light"
 }
 
 const sizes = {
@@ -12,7 +13,21 @@ const sizes = {
   lg: { symbol: 28, text: 22, gap: 12 },
 }
 
-export function ArbiterLogo({ variant = "symbol-name", size = "md", theme = "dark" }: LogoProps) {
+export function ArbiterLogo({ variant = "symbol-name", size = "md" }: LogoProps) {
+  const [theme, setTheme] = useState<"dark" | "light">("dark")
+
+  useEffect(() => {
+    const el = document.documentElement
+    const update = () => {
+      const t = el.getAttribute("data-theme") as "dark" | "light" | null
+      setTheme(t ?? "dark")
+    }
+    update()
+    const obs = new MutationObserver(update)
+    obs.observe(el, { attributes: true, attributeFilter: ["data-theme"] })
+    return () => obs.disconnect()
+  }, [])
+
   const s = sizes[size]
   const color = theme === "dark" ? "#ffffff" : "#1a1a1a"
 

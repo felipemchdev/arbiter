@@ -1,13 +1,13 @@
 # Arbiter
 
-[Português 🇧🇷](#pt-br) · [English 🇺🇸](#en)
+[Português](#pt-br) · [English](#en)
 
-Pipeline observability — push events, get a dashboard.  
-Observabilidade de pipelines — envie eventos, tenha um dashboard.
+Pipeline observability - push events, get a dashboard.  
+Observabilidade de pipelines - envie eventos, tenha um dashboard.
 
 ---
 
-## 🇧🇷 PT-BR
+## PT-BR
 
 ### Arquitetura
 
@@ -44,11 +44,11 @@ Observabilidade de pipelines — envie eventos, tenha um dashboard.
 
 | Serviço | Porta | Descrição |
 |---|---|---|
-| `arbiter-api` | 8000 | API REST — ingestão de runs, métricas, autenticação JWT + API keys |
-| `arbiter-dashboard` | 3000 | Frontend Next.js — DAG interativo (ReactFlow), métricas, timeline, alertas, tema dark/light |
-| `arbiter-worker` | — | Celery worker + beat — executa `check_stale_pipelines` a cada 10 min |
-| `arbiter-redis` | 6379 | Redis 7 — broker e result backend do Celery |
-| `postgres` | 5432 | PostgreSQL 15 — fonte única de verdade |
+| `arbiter-api` | 8000 | API REST - ingestão de runs, métricas, autenticação JWT + API keys |
+| `arbiter-dashboard` | 3000 | Frontend Next.js - DAG interativo (ReactFlow), métricas, timeline, alertas, tema dark/light |
+| `arbiter-worker` | - | Celery worker + beat - executa `check_stale_pipelines` a cada 10 min |
+| `arbiter-redis` | 6379 | Redis 7 - broker e result backend do Celery |
+| `postgres` | 5432 | PostgreSQL 15 - fonte única de verdade |
 
 ### Fluxo de dados
 
@@ -56,7 +56,7 @@ Observabilidade de pipelines — envie eventos, tenha um dashboard.
 2. A API persiste pipeline, run, tasks e DAG no PostgreSQL em uma transação atômica
 3. No mesmo request, processa o evento inline: calcula `duration_ms`, atualiza `last_run_status`, cria alerta de `failure` se necessário
 4. O dashboard consulta a API e renderiza tudo em tempo real
-5. A cada 10 min, o Celery Beat dispara `check_stale_pipelines` — varre pipelines sem runs em 24h e cria alertas `no_run`
+5. A cada 10 min, o Celery Beat dispara `check_stale_pipelines` - varre pipelines sem runs em 24h e cria alertas `no_run`
 
 ### Quick Start
 
@@ -132,7 +132,7 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 ---
 
-## 🇺🇸 EN
+## EN
 
 Arbiter is a lightweight observability layer for data pipelines. It does **not** orchestrate, schedule, or execute anything. It receives run events via HTTP and displays DAGs, metrics, task timelines, and alerts.
 
@@ -171,11 +171,11 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
 
 | Service | Port | Description |
 |---|---|---|
-| `arbiter-api` | 8000 | Core REST API — run ingestion, metrics, JWT + API key auth |
-| `arbiter-dashboard` | 3000 | Next.js frontend — interactive DAG (ReactFlow), metrics, timeline, alerts, dark/light theme |
-| `arbiter-worker` | — | Celery worker + beat — runs `check_stale_pipelines` every 10 min |
-| `arbiter-redis` | 6379 | Redis 7 — Celery broker and result backend |
-| `postgres` | 5432 | PostgreSQL 15 — single source of truth |
+| `arbiter-api` | 8000 | Core REST API - run ingestion, metrics, JWT + API key auth |
+| `arbiter-dashboard` | 3000 | Next.js frontend - interactive DAG (ReactFlow), metrics, timeline, alerts, dark/light theme |
+| `arbiter-worker` | - | Celery worker + beat - runs `check_stale_pipelines` every 10 min |
+| `arbiter-redis` | 6379 | Redis 7 - Celery broker and result backend |
+| `postgres` | 5432 | PostgreSQL 15 - single source of truth |
 
 ### Data flow
 
@@ -183,7 +183,7 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
 2. The API persists pipeline, run, tasks, and DAG definition in PostgreSQL in a single atomic transaction
 3. In the same request, it processes the event inline: computes `duration_ms`, updates `last_run_status`, creates a `failure` alert if needed
 4. The dashboard queries the API and renders everything in real time
-5. Every 10 min, Celery Beat triggers `check_stale_pipelines` — scans for pipelines with no runs in 24h and creates `no_run` alerts
+5. Every 10 min, Celery Beat triggers `check_stale_pipelines` - scans for pipelines with no runs in 24h and creates `no_run` alerts
 
 ### Quick Start
 

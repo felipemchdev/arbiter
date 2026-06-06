@@ -46,9 +46,9 @@ async def main() -> None:
                     org_id=org.id,
                 )
                 session.add(user)
-                print(f"[seed] User created: {u["email"]} ({u["role"]})")
+                print(f"[seed] User created: {u['email']} ({u['role']})")
             else:
-                print(f"[seed] User already exists: {u["email"]}")
+                print(f"[seed] User already exists: {u['email']}")
 
         await session.commit()
         print("[seed] Done.")

@@ -30,44 +30,33 @@ async def health(db: AsyncSession = Depends(get_db)):
 @router.get("/metrics")
 async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depends(get_db)):
     today = datetime.now(UTC).date()
-    from sqlalchemy import func
     count_result = await db.execute(
         select(func.count()).select_from(Pipeline)
         .where(Pipeline.org_id == current_org.id, Pipeline.last_run_status != RunStatus.failed)
     )
     active_pipelines = count_result.scalar_one()
     run_result = await db.execute(
-        text(
-            """
-            SELECT COUNT(*) AS total,
-                   SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
-            FROM pipeline_runs pr
-            JOIN pipelines p ON p.id = pr.pipeline_id
-            WHERE p.org_id = :org_id AND DATE(pr.started_at) = :today
-            """
-        ),
-        {"org_id": str(current_org.id), "today": today},
+        select(
+            func.count(PipelineRun.id).label("total"),
+            func.sum(case(when(PipelineRun.status == RunStatus.failed, 1), else_=0)).label("failed")
+        )
+        .join(Pipeline, PipelineRun.pipeline_id == Pipeline.id)
+        .where(Pipeline.org_id == current_org.id, func.date(PipelineRun.started_at) == today)
     )
     row = run_result.first()
     total_runs = int(row.total or 0) if row else 0
     failed_runs = int(row.failed or 0) if row else 0
     avg_duration_result = await db.execute(
-        text(
-            """
-            SELECT AVG(duration_ms) AS avg_duration
-            FROM pipeline_runs pr
-            JOIN pipelines p ON p.id = pr.pipeline_id
-            WHERE p.org_id = :org_id AND DATE(pr.started_at) = :today
-            """
-        ),
-        {"org_id": str(current_org.id), "today": today},
+        select(func.avg(PipelineRun.duration_ms))
+        .join(Pipeline, PipelineRun.pipeline_id == Pipeline.id)
+        .where(Pipeline.org_id == current_org.id, func.date(PipelineRun.started_at) == today)
     )
     avg_row = avg_duration_result.first()
     return {
         "runs_today": total_runs,
         "failed_today": failed_runs,
         "active_pipelines": active_pipelines,
-        "avg_duration_ms": float(avg_row.avg_duration or 0) if avg_row else 0,
+        "avg_duration_ms": float(avg_row[0] or 0) if avg_row else 0,
     }
 
 
@@ -77,7 +66,8 @@ async def runs_per_day(
     current_org=Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ):
-    since = datetime.now(UTC) - timedelta(days=days)
+    now = datetime.now(UTC)
+    since = now - timedelta(days=days)
 
     result = await db.execute(
         select(
@@ -100,7 +90,7 @@ async def runs_per_day(
     row_map = {row.day: {"count": row.count, "failed": row.failed} for row in rows}
     output = []
     for i in range(days):
-        d = (datetime.now(UTC) - timedelta(days=days - 1 - i)).date()
+        d = (now - timedelta(days=days - 1 - i)).date()
         output.append({
             "date": d.isoformat(),
             "label": d.strftime("%b %d"),

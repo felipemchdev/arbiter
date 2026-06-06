@@ -1,13 +1,13 @@
 # Arbiter
 
-[Português 🇧🇷](#pt-br) · [English 🇺🇸](#en)
+[Português](#pt-br) · [English](#en)
 
 Pipeline observability — push events, get a dashboard.  
 Observabilidade de pipelines — envie eventos, tenha um dashboard.
 
 ---
 
-## 🇧🇷 PT-BR
+##PT-BR
 
 ### Arquitetura
 
@@ -132,7 +132,7 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 ---
 
-## 🇺🇸 EN
+##EN
 
 Arbiter is a lightweight observability layer for data pipelines. It does **not** orchestrate, schedule, or execute anything. It receives run events via HTTP and displays DAGs, metrics, task timelines, and alerts.
 

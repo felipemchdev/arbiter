@@ -70,7 +70,7 @@ async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depen
     }
 
 
-@@router.get("/metrics/runs-per-day")
+@router.get("/metrics/runs-per-day")
 async def runs_per_day(
     days: int = Query(default=7, ge=1, le=90),
     current_org=Depends(get_current_org),

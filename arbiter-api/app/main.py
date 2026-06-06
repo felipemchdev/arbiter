@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
 
 from alembic.config import Config as AlembicConfig
 from alembic import command
@@ -15,7 +16,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    alembic_cfg = AlembicConfig("/app/alembic.ini")
+    alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
+    alembic_cfg = AlembicConfig(str(alembic_ini))
     command.upgrade(alembic_cfg, "head")
     yield
 

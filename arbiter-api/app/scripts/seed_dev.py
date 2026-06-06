@@ -30,8 +30,8 @@ async def main() -> None:
 
         # Create fixed users
         users = [
-            {"email": "mch@default", "password": "@Camis#1", "role": "owner"},
-            {"email": "user@common", "password": "123", "role": "viewer"},
+            {"email": "admin@arbiter", "password": "arbiter26@", "role": "owner"},
+            {"email": "viewer@arbiter", "password": "arbiter26@", "role": "viewer"},
         ]
 
         for u in users:

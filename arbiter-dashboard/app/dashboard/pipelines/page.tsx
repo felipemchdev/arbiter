@@ -1,6 +1,6 @@
 import { StatusBadge } from "@/components/status-badge";
 import { SourceBadge } from "@/components/source-badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button-arbiter";
 import { authOptions } from "@/lib/auth";
 import { getPipelines } from "@/lib/api";
 import { getServerSession } from "next-auth";

@@ -1,51 +1,66 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button-arbiter";
 import { resolveAlert } from "@/lib/api";
 import type { Alert } from "@/lib/types";
 import { useIsOwner } from "@/lib/useRole";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
+const alertTypeColor = (type: string) => {
+  if (type === "failure") return "var(--failed)";
+  if (type === "duration_exceeded") return "var(--running)";
+  if (type === "no_run") return "var(--skipped)";
+  return "var(--border)";
+};
+
 export function AlertList({ alerts, token }: { alerts: Alert[]; token?: string }) {
-    const router = useRouter();
-    const [pending, startTransition] = useTransition();
-    const isOwner = useIsOwner();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const isOwner = useIsOwner();
 
-    const getBorderColor = (type: string) => {
-        if (type === "failure") return "border-l-[4px] border-l-[var(--status-failed)]";
-        if (type === "duration_exceeded") return "border-l-[4px] border-l-[var(--status-running)]";
-        if (type === "no_run") return "border-l-[4px] border-l-[var(--status-skipped)]";
-        return "border-l-[4px] border-l-[var(--border)]";
-    };
-
-    return (
-        <div className="space-y-3">
-            {alerts.map((alert) => (
-                <Card key={alert.id} className={getBorderColor(alert.type)}>
-                    <CardContent className="flex items-center justify-between gap-4 p-4">
-                        <div>
-                            <div className="font-medium font-sans text-[var(--text-primary)] capitalize">{alert.type.replace("_", " ")}</div>
-                            <div className="mt-1 text-sm text-[var(--text-muted)] font-sans">{alert.message}</div>
-                        </div>
-                        {isOwner && (
-                            <Button
-                                className="bg-transparent border border-[var(--border)] text-[var(--text-primary)] rounded-[10px] hover:bg-[var(--bg-surface)] hover:text-white transition"
-                                disabled={pending}
-                                onClick={() =>
-                                    startTransition(async () => {
-                                        await resolveAlert(alert.id, token);
-                                        router.refresh();
-                                    })
-                                }
-                            >
-                                Resolver
-                            </Button>
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
+  return (
+    <div className="space-y-2">
+      {alerts.map((alert) => (
+        <div key={alert.id} style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderLeft: `3px solid ${alertTypeColor(alert.type)}`,
+          borderRadius: 'var(--r-lg)',
+          padding: '16px 20px',
+          marginBottom: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          transition: 'all var(--duration-fast) var(--ease)',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'var(--bg-card)')}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', marginBottom: 4 }}>
+              {alert.message}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace", display: 'flex', gap: 12 }}>
+              <span>{alert.pipeline_id.slice(0, 8)}...</span>
+              <span>{String.fromCharCode(183)}</span>
+              <span>{new Date(alert.created_at).toLocaleString()}</span>
+            </div>
+          </div>
+          {isOwner && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                startTransition(async () => {
+                  await resolveAlert(alert.id, token);
+                  router.refresh();
+                })
+              }
+              disabled={pending}
+            >
+              Resolve
+            </Button>
+          )}
         </div>
-    );
+      ))}
+    </div>
+  );
 }

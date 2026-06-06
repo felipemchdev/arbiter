@@ -63,9 +63,7 @@ export default async function PipelinesPage() {
               borderBottom: '1px solid var(--border)',
               alignItems: 'center',
               transition: 'background var(--duration-fast) var(--ease)',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 2 }}>
                   {p.name}

@@ -1,7 +1,5 @@
 import { RunTimeline } from "@/components/run-timeline";
 import { StatusBadge } from "@/components/status-badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { authOptions } from "@/lib/auth";
 import { getRun, getRunTasks, getPipeline } from "@/lib/api";
 import { getServerSession } from "next-auth";
@@ -34,9 +32,7 @@ export default async function RunDetailPage({ params }: { params: { runId: strin
           {pipeline && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               Pipeline:{' '}
-              <Link href={`/dashboard/pipelines/${pipeline.id}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}
-                onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-                onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}>
+              <Link href={`/dashboard/pipelines/${pipeline.id}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>
                 {pipeline.name}
               </Link>
             </span>
@@ -85,9 +81,7 @@ export default async function RunDetailPage({ params }: { params: { runId: strin
                 padding: '12px 20px', borderBottom: '1px solid var(--border)',
                 alignItems: 'center',
                 transition: 'background var(--duration-fast) var(--ease)',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-surface)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              }}>
                 <div style={{ fontSize: 13, fontWeight: 500, fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' }}>
                   {task.task_id}
                 </div>

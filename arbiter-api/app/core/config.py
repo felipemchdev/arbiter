@@ -27,7 +27,14 @@ class Settings(BaseSettings):
     @classmethod
     def parse_cors_origins(cls, v):
         if isinstance(v, list):
-            return v
+            normalized = []
+            for item in v:
+                if not isinstance(item, str):
+                    raise ValueError(f"All CORS origins must be strings, got {type(item)}")
+                stripped = item.strip()
+                if stripped:
+                    normalized.append(stripped)
+            return normalized
         if isinstance(v, str):
             if not v.strip():
                 return []

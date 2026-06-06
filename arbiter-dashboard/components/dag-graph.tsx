@@ -43,36 +43,40 @@ function buildLayout(
   return { layoutNodes, layoutEdges };
 }
 
+const statusColor = (status: string) =>
+  status === "success"
+    ? "var(--success)"
+    : status === "failed"
+      ? "var(--failed)"
+      : status === "running"
+        ? "var(--running)"
+        : "var(--skipped)";
+
 function DagNode({ data }: { data: { label?: string; status?: TaskStatus } }) {
   const status = (data.status || "skipped") as TaskStatus;
-  const statusColor =
-    status === "success"
-      ? "var(--status-success)"
-      : status === "failed"
-        ? "var(--status-failed)"
-        : status === "running"
-          ? "var(--status-running)"
-          : "var(--status-skipped)";
-          
+  const color = statusColor(status);
+
   return (
     <div
       style={{
-        background: 'rgba(25, 42, 78, 0.70)',
-        border: `1px solid ${statusColor}`,
-        borderRadius: '10px',
+        background: 'var(--bg-card)',
+        border: `1px solid ${color}`,
+        borderRadius: 10,
+        padding: '8px 16px',
+        color: 'var(--text)',
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: 13, fontWeight: 500,
+        minWidth: 130,
+        textAlign: 'center' as const,
         backdropFilter: 'blur(8px)',
-        color: '#FFFFFF',
-        fontFamily: 'DM Sans, sans-serif',
-        fontSize: '13px',
-        padding: '8px 14px',
       }}
     >
-      <Handle type="target" position={Position.Top} className="!bg-[var(--accent-blue)]" />
-      <div className="font-medium">{data.label}</div>
-      <div className="mt-1">
-        <StatusBadge status={status} />
+      <Handle type="target" position={Position.Top} style={{ background: 'var(--accent)' }} />
+      <div style={{ fontWeight: 500 }}>{data.label}</div>
+      <div style={{ marginTop: 4 }}>
+        <StatusBadge status={status} size="sm" />
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-[var(--accent-blue)]" />
+      <Handle type="source" position={Position.Bottom} style={{ background: 'var(--accent)' }} />
     </div>
   );
 }
@@ -126,8 +130,8 @@ export function DagGraph({
   );
 
   return (
-    <div className="relative flex h-[600px] rounded-[var(--card-radius)] border border-[var(--border)] bg-[#000000] overflow-hidden">
-      <div className="flex-1">
+    <div style={{ position: 'relative', display: 'flex', height: 420, borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'transparent', overflow: 'hidden' }}>
+      <div style={{ flex: 1 }}>
         <ReactFlow
           nodes={enrichedNodes}
           edges={layoutEdges}
@@ -137,54 +141,70 @@ export function DagGraph({
           proOptions={{ hideAttribution: true }}
           style={{ background: 'transparent' }}
           defaultEdgeOptions={{
-            style: { stroke: 'rgba(100, 140, 220, 0.40)', strokeWidth: 1.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(100, 140, 220, 0.40)' }
+            style: { stroke: 'var(--border-hover)', strokeWidth: 1.5 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: 'rgba(255,255,255,0.20)' },
           }}
         >
-          <Background color="rgba(100, 140, 220, 0.06)" gap={20} />
-          <Controls />
+          <Background color="var(--border)" gap={24} size={1} />
+          <Controls style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)' }} />
         </ReactFlow>
       </div>
 
       {selectedTask && (
-        <div className="w-[320px] shrink-0 border-l border-[var(--border)] bg-[rgba(10,18,40,0.90)] backdrop-blur-[20px] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="text-sm font-semibold text-[var(--text-primary)]">Task Details</div>
-            <button
-              onClick={() => setSelectedTask(null)}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="space-y-4 text-sm font-sans">
+        <div className="animate-slide-right" style={{
+          width: 340, flexShrink: 0,
+          borderLeft: '1px solid var(--border)',
+          background: 'var(--bg-overlay)',
+          backdropFilter: 'blur(24px)',
+          padding: 28,
+          overflowY: 'auto',
+          display: 'flex', flexDirection: 'column', gap: 20,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Task ID</div>
-              <div className="mt-1 font-medium text-[var(--text-primary)]">{selectedTask.task_id}</div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Status</div>
-              <div className="mt-1">
-                <StatusBadge status={selectedTask.status} />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Task</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)', fontFamily: "'JetBrains Mono', monospace" }}>
+                {selectedTask.task_id}
               </div>
             </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Duration</div>
-              <div className="mt-1 text-[var(--text-primary)]">{selectedTask.duration_ms ? `${selectedTask.duration_ms} ms` : "—"}</div>
-            </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Try Number</div>
-              <div className="mt-1 text-[var(--text-primary)]">{selectedTask.try_number}</div>
-            </div>
-            {selectedTask.error_message && (
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Error</div>
-                <div className="mt-1 rounded-[10px] border border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.06)] p-3 text-xs text-[var(--status-failed)] font-mono overflow-auto max-h-[150px]">
-                  {selectedTask.error_message}
-                </div>
-              </div>
-            )}
+            <button onClick={() => setSelectedTask(null)} style={{
+              background: 'var(--bg-surface)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)', width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-muted)',
+            }}>{String.fromCharCode(10005)}</button>
           </div>
+
+          <StatusBadge status={selectedTask.status} />
+
+          {[
+            { label: 'Duration',    value: selectedTask.duration_ms ? `${(selectedTask.duration_ms / 1000).toFixed(1)}s` : '—', mono: true },
+            { label: 'Try number',  value: selectedTask.try_number, mono: true },
+            { label: 'Started at',  value: '—', mono: false },
+          ].map(({ label, value, mono }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', fontFamily: mono ? "'JetBrains Mono', monospace" : "'DM Sans', sans-serif" }}>{value}</span>
+            </div>
+          ))}
+
+          {selectedTask.error_message && (
+            <div style={{
+              background: 'rgba(239,68,68,0.06)',
+              border: '1px solid rgba(239,68,68,0.18)',
+              borderRadius: 'var(--r-md)',
+              padding: '12px 14px',
+            }}>
+              <div style={{ fontSize: 10, color: 'var(--failed)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>Error</div>
+              <pre style={{
+                fontSize: 11, color: 'rgba(239,68,68,0.85)',
+                fontFamily: "'JetBrains Mono', monospace",
+                lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                margin: 0,
+              }}>{selectedTask.error_message}</pre>
+            </div>
+          )}
         </div>
       )}
     </div>

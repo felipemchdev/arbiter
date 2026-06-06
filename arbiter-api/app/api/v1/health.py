@@ -84,7 +84,7 @@ async def runs_per_day(
             cast(PipelineRun.started_at, Date).label("day"),
             func.count(PipelineRun.id).label("count"),
             func.sum(
-                func.case((PipelineRun.status == "failed", 1), else_=0)
+                func.case((PipelineRun.status == "failed", 1), default=0)
             ).label("failed"),
         )
         .join(Pipeline, PipelineRun.pipeline_id == Pipeline.id)
@@ -109,4 +109,3 @@ async def runs_per_day(
         })
 
     return {"data": output, "days": days}
-

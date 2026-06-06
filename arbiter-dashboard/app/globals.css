@@ -176,6 +176,18 @@ body {
   border-radius: var(--r-md);
 }
 
+
+.text-xs    { font-size: 11px; line-height: 1.5; }
+.text-sm    { font-size: 13px; line-height: 1.5; }
+.text-base  { font-size: 15px; line-height: 1.6; }
+.text-lg    { font-size: 18px; line-height: 1.4; }
+.text-xl    { font-size: 22px; line-height: 1.3; }
+.text-2xl   { font-size: 28px; line-height: 1.2; }
+.text-3xl   { font-size: 36px; line-height: 1.1; }
+
+.font-mono  { font-family: "JetBrains Mono", monospace; }
+.font-display { font-family: "Pragmatica Extended", "DM Sans", sans-serif; }
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

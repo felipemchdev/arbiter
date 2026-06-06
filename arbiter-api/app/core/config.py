@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
+    cors_origins: str = "http://localhost:3000"
 
     def model_post_init(self, __context) -> None:
         if self.secret_key == "change-me-in-production":

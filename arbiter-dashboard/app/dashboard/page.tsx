@@ -2,7 +2,7 @@ import { AlertList } from "@/components/alert-list";
 import { MetricsCard } from "@/components/metrics-card";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { authOptions } from "@/lib/auth";
-import { getAlerts, getMetrics } from "@/lib/api";
+import { getAlerts, getMetrics, apiGet } from "@/lib/api";
 import { getServerSession } from "next-auth";
 import { RunsChart } from "@/components/runs-chart";
 
@@ -11,6 +11,13 @@ export default async function DashboardPage() {
   const token = session?.accessToken;
   const metrics = (await getMetrics(token)) ?? { runs_today: 0, failed_today: 0, active_pipelines: 0, avg_duration_ms: 0 };
   const alerts = await getAlerts(token);
+
+  let chartData: { data: { date: string; label: string; count: number; failed: number }[]; days: number } = { data: [], days: 7 };
+  try {
+    chartData = await apiGet("/api/v1/metrics/runs-per-day?days=7", token as string);
+  } catch {
+    // chartData stays with empty array
+  }
 
   return (
     <div className="space-y-8">
@@ -70,7 +77,7 @@ export default async function DashboardPage() {
           <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 16 }}>
             Runs / 7 days
           </div>
-          <RunsChart runsToday={metrics.runs_today} />
+          <RunsChart data={chartData.data} />
         </div>
 
         <div className="animate-slide-up delay-3" style={{

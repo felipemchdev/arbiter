@@ -70,7 +70,7 @@ async def metrics(current_org=Depends(get_current_org), db: AsyncSession = Depen
     }
 
 
-@router.get("/metrics/runs-per-day")
+@@router.get("/metrics/runs-per-day")
 async def runs_per_day(
     days: int = Query(default=7, ge=1, le=90),
     current_org=Depends(get_current_org),
@@ -79,23 +79,27 @@ async def runs_per_day(
     since = datetime.now(UTC) - timedelta(days=days)
 
     result = await db.execute(
-        text(
-            """
-            SELECT DATE(pr.started_at) AS day,
-                   COUNT(pr.id) AS count,
-                   SUM(CASE WHEN pr.status = 'failed' THEN 1 ELSE 0 END) AS failed
-            FROM pipeline_runs pr
-            JOIN pipelines p ON p.id = pr.pipeline_id
-            WHERE p.org_id = :org_id AND pr.started_at >= :since
-            GROUP BY DATE(pr.started_at)
-            ORDER BY DATE(pr.started_at) ASC
-            """
-        ),
-        {"org_id": str(current_org.id), "since": since},
+        select(
+            cast(PipelineRun.started_at, Date).label("day"),
+            func.count(PipelineRun.id).label("count"),
+            func.sum(
+                func.case(
+                    (PipelineRun.status == RunStatus.failed, 1),
+                    else_=0,
+                )
+            ).label("failed"),
+        )
+        .join(Pipeline, PipelineRun.pipeline_id == Pipeline.id)
+        .where(
+            Pipeline.org_id == current_org.id,
+            PipelineRun.started_at >= since,
+        )
+        .group_by(cast(PipelineRun.started_at, Date))
+        .order_by(cast(PipelineRun.started_at, Date).asc())
     )
     rows = result.all()
 
-    row_map = {row.day: {"count": row.count, "failed": row.failed} for row in rows}
+    row_map = {row.day: {"count": int(row.count), "failed": int(row.failed or 0)} for row in rows}
     output = []
     for i in range(days):
         d = (datetime.now(UTC) - timedelta(days=days - 1 - i)).date()

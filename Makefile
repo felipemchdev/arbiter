@@ -10,10 +10,10 @@ build:
 	cd arbiter-dashboard && npm run build
 
 test:
-	cd arbiter-api && pytest app/tests/ -v
+	cd arbiter-api && pytest app/tests/ -v  # requires local venv with pytest
 
 lint:
-	cd arbiter-api && ruff check app/
+	cd arbiter-api && ruff check app/  # requires local ruff install
 
 ps:
 	docker compose ps

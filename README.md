@@ -68,7 +68,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
+# Dashboard:  http://localhost:3000 (login: admin@arbiter / arbiter26@)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```

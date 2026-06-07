@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     _lock_acquired = False
     try:

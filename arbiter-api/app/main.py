@@ -36,7 +36,14 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.project_name, lifespan=lifespan)
+app = FastAPI(
+    title=settings.project_name,
+    version="0.1.0",
+    description="Pipeline observability — ingest-first monitoring for data pipelines. Receives run events via HTTP and provides DAG visualization, metrics, and alerts.",
+    contact={"name": "Felipe Machado", "url": "https://github.com/felipemchdev/arbiter"},
+    license_info={"name": "MIT"},
+    lifespan=lifespan,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

@@ -1,5 +1,9 @@
 # Arbiter
 
+[![CI](https://github.com/felipemchdev/arbiter/actions/workflows/deploy.yml/badge.svg)](https://github.com/felipemchdev/arbiter/actions/workflows/deploy.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+
 [Português](#pt-br) · [English](#en)
 
 

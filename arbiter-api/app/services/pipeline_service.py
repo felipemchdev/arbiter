@@ -36,7 +36,7 @@ async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate
     session.add(pipeline)
     await session.commit()
     await session.refresh(pipeline)
-    logger.info("pipeline_upserted", extra={"pipeline_id": str(pipeline.id), "org_id": str(org_id)})
+    logger.debug("pipeline_staged", extra={"pipeline_id": str(pipeline.id), "org_id": str(org_id)})
     return pipeline
 
 

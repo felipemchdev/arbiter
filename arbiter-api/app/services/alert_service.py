@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert, AlertType
+from app.core.config import settings
 from app.models.pipeline import Pipeline
 from app.models.pipeline_run import PipelineRun
 
@@ -77,7 +78,7 @@ async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> Non
 
 
 async def check_stale_pipelines_sync(session: AsyncSession) -> int:
-    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    cutoff = datetime.now(UTC) - timedelta(hours=settings.stale_pipeline_hours)
 
     latest_run_subq = (
         select(

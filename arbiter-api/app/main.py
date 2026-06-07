@@ -18,7 +18,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 async def lifespan(_: FastAPI):
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
-    command.upgrade(alembic_cfg, "head")
+    # Lock-based migration guard: only one replica runs migrations.
+    # Uses a database-level advisory lock to serialize startup.
+    try:
+        from alembic.runtime.migration import MigrationContext
+        from sqlalchemy import text
+        from app.core.database import async_session_maker
+        async with async_session_maker() as session:
+            await session.execute(text("SELECT pg_advisory_lock(1234567890)"))
+            try:
+                await session.run_sync(lambda conn: command.upgrade(alembic_cfg, "head"))
+            finally:
+                await session.execute(text("SELECT pg_advisory_unlock(1234567890)"))
+    except Exception:
+        # Non-PostgreSQL or lock failure: fall back to direct upgrade
+        command.upgrade(alembic_cfg, "head")
     yield
 
 

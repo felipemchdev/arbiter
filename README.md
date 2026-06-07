@@ -40,13 +40,13 @@
 
 ### Componentes
 
-| Serviço | Porta | Descrição |
-|---|---|---|
-| `arbiter-api` | 8000 | API REST - ingestão de runs, métricas, autenticação JWT + API keys |
-| `arbiter-dashboard` | 3000 | Frontend Next.js - DAG interativo (ReactFlow), métricas, timeline, alertas, tema dark/light |
-| `arbiter-worker` | - | Celery worker + beat - executa `check_stale_pipelines` a cada 10 min |
-| `arbiter-redis` | 6379 | Redis 7 - broker e result backend do Celery |
-| `postgres` | 5432 | PostgreSQL 15 - fonte única de verdade |
+| Serviço             | Porta | Descrição                                                                                   |
+| ------------------- | ----- | ------------------------------------------------------------------------------------------- |
+| `arbiter-api`       | 8000  | API REST - ingestão de runs, métricas, autenticação JWT + API keys                          |
+| `arbiter-dashboard` | 3000  | Frontend Next.js - DAG interativo (ReactFlow), métricas, timeline, alertas, tema dark/light |
+| `arbiter-worker`    | -     | Celery worker + beat - executa `check_stale_pipelines` a cada 10 min                        |
+| `arbiter-redis`     | 6379  | Redis 7 - broker e result backend do Celery                                                 |
+| `postgres`          | 5432  | PostgreSQL 15 - fonte única de verdade                                                      |
 
 ### Fluxo de dados
 
@@ -64,7 +64,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000  (login: admin / arbiter26@)
+# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -103,10 +103,10 @@ curl -X POST http://localhost:8000/api/v1/runs/ingest \
 
 As seeds de bootstrap criam automaticamente:
 
-| Usuário | Senha | Role |
-|---|---|---|
-| `admin` | `arbiter26@` | owner |
-| `viewer` | `arbiter26@` | viewer |
+| Usuário          | Senha        | Role   |
+| ---------------- | ------------ | ------ |
+| `admin@arbiter`  | `arbiter26@` | owner  |
+| `viewer@arbiter` | `arbiter26@` | viewer |
 
 API Key aparece no log: `docker compose logs api | grep "API Key"`
 
@@ -167,13 +167,13 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
 
 ### Components
 
-| Service | Port | Description |
-|---|---|---|
-| `arbiter-api` | 8000 | Core REST API - run ingestion, metrics, JWT + API key auth |
+| Service             | Port | Description                                                                                 |
+| ------------------- | ---- | ------------------------------------------------------------------------------------------- |
+| `arbiter-api`       | 8000 | Core REST API - run ingestion, metrics, JWT + API key auth                                  |
 | `arbiter-dashboard` | 3000 | Next.js frontend - interactive DAG (ReactFlow), metrics, timeline, alerts, dark/light theme |
-| `arbiter-worker` | - | Celery worker + beat - runs `check_stale_pipelines` every 10 min |
-| `arbiter-redis` | 6379 | Redis 7 - Celery broker and result backend |
-| `postgres` | 5432 | PostgreSQL 15 - single source of truth |
+| `arbiter-worker`    | -    | Celery worker + beat - runs `check_stale_pipelines` every 10 min                            |
+| `arbiter-redis`     | 6379 | Redis 7 - Celery broker and result backend                                                  |
+| `postgres`          | 5432 | PostgreSQL 15 - single source of truth                                                      |
 
 ### Data flow
 
@@ -191,7 +191,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000  (login: admin / arbiter26@)
+# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -230,10 +230,10 @@ curl -X POST http://localhost:8000/api/v1/runs/ingest \
 
 Bootstrap seeds create automatically:
 
-| User | Password | Role |
-|---|---|---|
-| `admin` | `arbiter26@` | owner |
-| `viewer` | `arbiter26@` | viewer |
+| User             | Password     | Role   |
+| ---------------- | ------------ | ------ |
+| `admin@arbiter`  | `arbiter26@` | owner  |
+| `viewer@arbiter` | `arbiter26@` | viewer |
 
 API Key shows in container logs: `docker compose logs api | grep "API Key"`
 

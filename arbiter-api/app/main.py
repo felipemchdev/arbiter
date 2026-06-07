@@ -21,10 +21,7 @@ async def lifespan(_: FastAPI):
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
     loop = asyncio.get_event_loop()
-
-    # Advisory lock garante que apenas uma réplica executa migrações.
-    # run_in_executor usa uma thread real (ThreadPoolExecutor) — sem event loop
-    # rodando nela — portanto asyncio.run() em env.py funciona corretamente.
+    
     try:
         from sqlalchemy import text
         from app.core.database import async_session_maker
@@ -43,7 +40,6 @@ async def lifespan(_: FastAPI):
             finally:
                 await session.execute(text("SELECT pg_advisory_unlock(1234567890)"))
     except Exception:
-        # Sem PostgreSQL, sem lock, ou falha de conexão: fallback sem lock.
         logger.exception(
             "lifespan: advisory lock/connection failed — falling back to "
             "direct upgrade (exception above identifies the cause)"

@@ -143,11 +143,11 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
 ```
                    POST /api/v1/runs/ingest
 ┌──────────────┐  ──────────────────────────────►  ┌──────────────┐
-│  Airflow     │                                    │              │
-│  Azure Func  │                                    │  arbiter-api │
-│  Python      │                                    │  FastAPI     │
-│  Cron Job    │                                    │  :8000       │
-└──────────────┘                                    └──────┬───────┘
+│  Airflow     │                                   │              │
+│  Azure Func  │                                   │  arbiter-api │
+│  Python      │                                   │  FastAPI     │
+│  Cron Job    │                                   │  :8000       │
+└──────────────┘                                   └──────┬───────┘
                                                           │
                           ┌───────────────────────────────┼───────────────────────────────┐
                           │                               │                               │

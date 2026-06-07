@@ -9,7 +9,7 @@ else
   echo "[bootstrap] Skipping OSS seeds (RUN_SEEDS not set)"
 fi
 
-if [ -n "${ARBITER_ADMIN_EMAIL}" ] && [ -n "${ARBITER_ADMIN_PASSWORD}" ]; then
+if [ -n "${ARBITER_ADMIN_USER}" ] && [ -n "${ARBITER_ADMIN_PASSWORD}" ]; then
   echo "[bootstrap] Running production user upsert..."
   python -m app.scripts.seed_prod
 else

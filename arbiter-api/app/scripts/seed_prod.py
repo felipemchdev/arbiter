@@ -15,19 +15,19 @@ from app.models.user import User
 async def main() -> None:
     """Upsert production admin/viewer users from environment variables.
 
-    Reads ARBITER_ADMIN_EMAIL, ARBITER_ADMIN_PASSWORD, ARBITER_VIEWER_EMAIL,
+    Reads ARBITER_ADMIN_USER, ARBITER_ADMIN_PASSWORD, ARBITER_VIEWER_USER,
     ARBITER_VIEWER_PASSWORD from env vars. Skips silently if not set.
 
     These credentials are injected via GitHub Secrets in the deploy workflow
     and NEVER committed to the repository.
     """
-    admin_email = os.getenv("ARBITER_ADMIN_EMAIL", "").strip()
+    admin_user = os.getenv("ARBITER_ADMIN_USER", "").strip()
     admin_pass = os.getenv("ARBITER_ADMIN_PASSWORD", "").strip()
-    viewer_email = os.getenv("ARBITER_VIEWER_EMAIL", "").strip()
+    viewer_user = os.getenv("ARBITER_VIEWER_USER", "").strip()
     viewer_pass = os.getenv("ARBITER_VIEWER_PASSWORD", "").strip()
 
-    if not admin_email or not admin_pass:
-        print("[seed:prod] Skipping — ARBITER_ADMIN_EMAIL/PASSWORD not set")
+    if not admin_user or not admin_pass:
+        print("[seed:prod] Skipping — ARBITER_ADMIN_USER/PASSWORD not set")
         return
 
     await init_models()
@@ -39,8 +39,8 @@ async def main() -> None:
             return
 
         users = [
-            {"email": admin_email, "password": admin_pass, "role": "owner"},
-            {"email": viewer_email, "password": viewer_pass, "role": "viewer"},
+            {"email": admin_user, "password": admin_pass, "role": "owner"},
+            {"email": viewer_user, "password": viewer_pass, "role": "viewer"},
         ]
 
         for u in users:

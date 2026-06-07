@@ -64,7 +64,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
+# Dashboard:  http://localhost:3000  (login: admin / arbiter26@)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -105,8 +105,8 @@ As seeds de bootstrap criam automaticamente:
 
 | Usuário | Senha | Role |
 |---|---|---|
-| `admin@arbiter` | `arbiter26@` | owner |
-| `viewer@arbiter` | `arbiter26@` | viewer |
+| `admin` | `arbiter26@` | owner |
+| `viewer` | `arbiter26@` | viewer |
 
 API Key aparece no log: `docker compose logs api | grep "API Key"`
 
@@ -191,7 +191,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
+# Dashboard:  http://localhost:3000  (login: admin / arbiter26@)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -232,8 +232,8 @@ Bootstrap seeds create automatically:
 
 | User | Password | Role |
 |---|---|---|
-| `admin@arbiter` | `arbiter26@` | owner |
-| `viewer@arbiter` | `arbiter26@` | viewer |
+| `admin` | `arbiter26@` | owner |
+| `viewer` | `arbiter26@` | viewer |
 
 API Key shows in container logs: `docker compose logs api | grep "API Key"`
 

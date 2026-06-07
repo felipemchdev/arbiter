@@ -9,7 +9,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Arbiter",
   description: "Observability for data pipelines",
-  icons: { icon: "/arbiter-icon.svg", type: "image/svg+xml" },
+  icons: { icon: "/arbiter-icon.svg" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

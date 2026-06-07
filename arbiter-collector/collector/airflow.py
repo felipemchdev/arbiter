@@ -21,7 +21,7 @@ class AirflowClient:
         return self._cached_client
 
     def get_dags(self) -> list[dict]:
-        with self._client() as client:
+        client = self._get_client()
             response = client.get("/api/v1/dags")
             response.raise_for_status()
             data = response.json()
@@ -29,7 +29,7 @@ class AirflowClient:
             return [d for d in dags if not d.get("is_paused", False)]
 
     def get_runs(self, dag_id: str, limit: int = 5) -> list[dict]:
-        with self._client() as client:
+        client = self._get_client()
             response = client.get(
                 f"/api/v1/dags/{dag_id}/dagRuns",
                 params={"limit": limit, "order_by": "-start_date"},
@@ -39,14 +39,14 @@ class AirflowClient:
             return data.get("dag_runs", [])
 
     def get_tasks(self, dag_id: str) -> list[dict]:
-        with self._client() as client:
+        client = self._get_client()
             response = client.get(f"/api/v1/dags/{dag_id}/tasks")
             response.raise_for_status()
             data = response.json()
             return data.get("tasks", data if isinstance(data, list) else [])
 
     def get_task_instances(self, dag_id: str, run_id: str) -> list[dict]:
-        with self._client() as client:
+        client = self._get_client()
             response = client.get(
                 f"/api/v1/dags/{dag_id}/dagRuns/{run_id}/taskInstances",
             )

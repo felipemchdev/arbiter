@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
+from app.api.rate_limit import rate_limit
 from app.schemas.run import RunPayload, RunRead, TaskRead
 from app.schemas.collector import AirflowSyncPayload
 from app.services.run_service import get_run, ingest_run, list_tasks
@@ -10,6 +11,7 @@ router = APIRouter()
 
 
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
+@rate_limit(max_requests=120, window_seconds=60)
 async def ingest_run_endpoint(
     payload: RunPayload,
     current_org=Depends(get_current_org),
@@ -19,6 +21,7 @@ async def ingest_run_endpoint(
 
 
 @router.post("/ingest")
+@rate_limit(max_requests=30, window_seconds=60)
 async def ingest_batch(
     payload: AirflowSyncPayload,
     current_org=Depends(get_current_org),

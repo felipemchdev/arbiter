@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert, AlertType
+from app.core.config import settings
 from app.models.pipeline import Pipeline
 from app.models.pipeline_run import PipelineRun
 
@@ -77,7 +78,7 @@ async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> Non
 
 
 async def check_stale_pipelines_sync(session: AsyncSession) -> int:
-    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    cutoff = datetime.now(UTC) - timedelta(hours=settings.stale_pipeline_hours)
 
     latest_run_subq = (
         select(
@@ -95,7 +96,7 @@ async def check_stale_pipelines_sync(session: AsyncSession) -> int:
             Pipeline.id == latest_run_subq.c.pipeline_id,
         )
         .where(
-            Pipeline.created_at < datetime.now(UTC) - timedelta(hours=24),
+            Pipeline.created_at < cutoff,
             (latest_run_subq.c.latest_started.is_(None))
             | (latest_run_subq.c.latest_started < cutoff)
         )
@@ -107,7 +108,7 @@ async def check_stale_pipelines_sync(session: AsyncSession) -> int:
             session,
             pipeline_id=pipeline.id,
             alert_type=AlertType.no_run,
-            message=f"No runs for pipeline {pipeline.name} in the last 24 hours",
+            message=f"No runs for pipeline {pipeline.name} in the last {settings.stale_pipeline_hours} hours",
         )
         if alert is not None:
             created += 1

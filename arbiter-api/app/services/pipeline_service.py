@@ -36,7 +36,7 @@ async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate
     session.add(pipeline)
     await session.commit()
     await session.refresh(pipeline)
-    logger.info("pipeline_upserted", extra={"pipeline_id": str(pipeline.id), "org_id": str(org_id)})
+    logger.debug("pipeline_staged", extra={"pipeline_id": str(pipeline.id), "org_id": str(org_id)})
     return pipeline
 
 
@@ -77,3 +77,13 @@ async def upsert_dag_definition(session: AsyncSession, pipeline: Pipeline, nodes
     # NOTE: no commit here — caller is responsible for committing the transaction.
     # This function is intentionally a unit-of-work participant, not a transaction owner.
     return dag
+
+async def delete_pipeline(db: AsyncSession, pipeline_id: str, org_id) -> bool:
+    from uuid import UUID as _UUID
+    result = await db.execute(select(Pipeline).where(Pipeline.id == _UUID(pipeline_id), Pipeline.org_id == org_id))
+    pipeline = result.scalar_one_or_none()
+    if pipeline is None:
+        return False
+    await db.delete(pipeline)
+    await db.commit()
+    return True

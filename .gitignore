@@ -18,3 +18,14 @@ arbiter_test.db
 postgres_data/
 coverage/
 .DS_Store
+*.b64.tmp
+
+.idea/
+
+*.swp
+
+*.swo
+
+*~
+
+Thumbs.db

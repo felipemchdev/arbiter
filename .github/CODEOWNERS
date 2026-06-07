@@ -1,0 +1,6 @@
+# Arbiter CODEOWNERS
+arbiter-api/**       @felipemchdev
+arbiter-dashboard/** @felipemchdev
+arbiter-sdk/**       @felipemchdev
+arbiter-collector/** @felipemchdev
+*                    @felipemchdev

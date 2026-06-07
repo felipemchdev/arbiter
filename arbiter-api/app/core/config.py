@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
     cors_origins: Union[str, List[str]] = "http://localhost:3000"
+    stale_pipeline_hours: int = 24
 
     @field_validator("cors_origins", mode="before")
     @classmethod

@@ -20,26 +20,29 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
-    loop = asyncio.get_running_loop()
-    
+    loop = asyncio.get_event_loop()
+
+    _lock_acquired = False
     try:
         from sqlalchemy import text
         from app.core.database import async_session_maker
 
         async with async_session_maker() as session:
             await session.execute(text("SELECT pg_advisory_lock(1234567890)"))
+            _lock_acquired = True          # ← set AFTER lock is held
             try:
                 await loop.run_in_executor(
                     None, lambda: command.upgrade(alembic_cfg, "head")
                 )
-            except Exception:
-                logger.exception(
-                    "lifespan: migration failed inside advisory lock"
-                )
-                raise
             finally:
                 await session.execute(text("SELECT pg_advisory_unlock(1234567890)"))
+
     except Exception:
+        if _lock_acquired:
+            # Migration or unlock failed — abort startup, do NOT retry
+            logger.exception("lifespan: migration failed inside advisory lock — aborting")
+            raise
+        # Lock/connection setup failed — safe to fall back to direct upgrade
         logger.exception(
             "lifespan: advisory lock/connection failed — falling back to "
             "direct upgrade (exception above identifies the cause)"

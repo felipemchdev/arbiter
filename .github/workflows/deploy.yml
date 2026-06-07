@@ -76,7 +76,15 @@ jobs:
           docker build -t arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }} ./arbiter-dashboard
           docker push arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}
       - name: Deploy API
-        run: az containerapp update --name arbiter-api --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
+        run: |
+          az containerapp update \
+            --name arbiter-api --resource-group rg-eeip \
+            --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} \
+            --set-env-vars \
+            ARBITER_ADMIN_EMAIL="${{ secrets.ARBITER_ADMIN_EMAIL }}" \
+            ARBITER_ADMIN_PASSWORD="${{ secrets.ARBITER_ADMIN_PASSWORD }}" \
+            ARBITER_VIEWER_EMAIL="${{ secrets.ARBITER_VIEWER_EMAIL }}" \
+            ARBITER_VIEWER_PASSWORD="${{ secrets.ARBITER_VIEWER_PASSWORD }}"
       - name: Deploy Worker
         run: az containerapp update --name arbiter-worker --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
       - name: Deploy Dashboard

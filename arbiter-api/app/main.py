@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 from pathlib import Path
 
@@ -12,27 +13,44 @@ from app.core.config import settings
 from app.core.exceptions import install_exception_handlers
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
-    # Lock-based migration guard: only one replica runs migrations.
-    # Uses a database-level advisory lock to serialize startup.
+    loop = asyncio.get_running_loop()
+
+    _lock_acquired = False
     try:
-        from alembic.runtime.migration import MigrationContext
         from sqlalchemy import text
         from app.core.database import async_session_maker
+
         async with async_session_maker() as session:
             await session.execute(text("SELECT pg_advisory_lock(1234567890)"))
+            _lock_acquired = True          # ← set AFTER lock is held
             try:
-                await session.run_sync(lambda conn: command.upgrade(alembic_cfg, "head"))
+                await loop.run_in_executor(
+                    None, lambda: command.upgrade(alembic_cfg, "head")
+                )
             finally:
                 await session.execute(text("SELECT pg_advisory_unlock(1234567890)"))
+
     except Exception:
-        # Non-PostgreSQL or lock failure: fall back to direct upgrade
-        command.upgrade(alembic_cfg, "head")
+        if _lock_acquired:
+            # Migration or unlock failed — abort startup, do NOT retry
+            logger.exception("lifespan: migration failed inside advisory lock — aborting")
+            raise
+        # Lock/connection setup failed — safe to fall back to direct upgrade
+        logger.exception(
+            "lifespan: advisory lock/connection failed — falling back to "
+            "direct upgrade (exception above identifies the cause)"
+        )
+        await loop.run_in_executor(
+            None, lambda: command.upgrade(alembic_cfg, "head")
+        )
+
     yield
 
 

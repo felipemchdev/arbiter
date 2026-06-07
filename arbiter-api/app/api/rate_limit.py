@@ -18,7 +18,9 @@ def rate_limit(max_requests: int = 60, window_seconds: int = 60):
                     if isinstance(arg, Request):
                         request = arg
                         break
-            key = request.client.host if request and request.client else "unknown"
+            path = request.url.path if request else "unknown"
+            host = request.client.host if request and request.client else "unknown"
+            key = f"{host}:{path}"
             now = time.time()
             cutoff = now - window_seconds
 

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 from pathlib import Path
 
@@ -12,27 +13,45 @@ from app.core.config import settings
 from app.core.exceptions import install_exception_handlers
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
+`@asynccontextmanager`
 async def lifespan(_: FastAPI):
     alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
     alembic_cfg = AlembicConfig(str(alembic_ini))
-    # Lock-based migration guard: only one replica runs migrations.
-    # Uses a database-level advisory lock to serialize startup.
+    loop = asyncio.get_event_loop()
+
+    # Advisory lock garante que apenas uma réplica executa migrações.
+    # run_in_executor usa uma thread real (ThreadPoolExecutor) — sem event loop
+    # rodando nela — portanto asyncio.run() em env.py funciona corretamente.
     try:
-        from alembic.runtime.migration import MigrationContext
         from sqlalchemy import text
         from app.core.database import async_session_maker
+
         async with async_session_maker() as session:
             await session.execute(text("SELECT pg_advisory_lock(1234567890)"))
             try:
-                await session.run_sync(lambda conn: command.upgrade(alembic_cfg, "head"))
+                await loop.run_in_executor(
+                    None, lambda: command.upgrade(alembic_cfg, "head")
+                )
+            except Exception:
+                logger.exception(
+                    "lifespan: migration failed inside advisory lock"
+                )
+                raise
             finally:
                 await session.execute(text("SELECT pg_advisory_unlock(1234567890)"))
     except Exception:
-        # Non-PostgreSQL or lock failure: fall back to direct upgrade
-        command.upgrade(alembic_cfg, "head")
+        # Sem PostgreSQL, sem lock, ou falha de conexão: fallback sem lock.
+        logger.exception(
+            "lifespan: advisory lock/connection failed — falling back to "
+            "direct upgrade (exception above identifies the cause)"
+        )
+        await loop.run_in_executor(
+            None, lambda: command.upgrade(alembic_cfg, "head")
+        )
+
     yield
 
 

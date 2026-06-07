@@ -4,17 +4,31 @@ from functools import wraps
 
 from fastapi import HTTPException, Request, status
 
-# In-memory token bucket: { ip_or_key: [(timestamp, ...)] }
 _requests: dict[str, list[float]] = defaultdict(list)
+_last_cleanup: float = time.time()
 
 
 def rate_limit(max_requests: int = 60, window_seconds: int = 60):
     def decorator(func):
         @wraps(func)
-        async def wrapper(request: Request, *args, **kwargs):
-            key = request.client.host if request.client else "unknown"
+        async def wrapper(*args, **kwargs):
+            request = kwargs.get("request")
+            if request is None:
+                for arg in args:
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
+            key = request.client.host if request and request.client else "unknown"
             now = time.time()
             cutoff = now - window_seconds
+
+            global _last_cleanup
+            if now - _last_cleanup > 60:
+                stale = [k for k, v in _requests.items() if not v or max(v) < cutoff]
+                for k in stale:
+                    del _requests[k]
+                _last_cleanup = now
+
             _requests[key] = [t for t in _requests.get(key, []) if t > cutoff]
             if len(_requests[key]) >= max_requests:
                 raise HTTPException(
@@ -22,6 +36,6 @@ def rate_limit(max_requests: int = 60, window_seconds: int = 60):
                     detail=f"Rate limit exceeded: {max_requests} requests per {window_seconds}s",
                 )
             _requests[key].append(now)
-            return await func(request, *args, **kwargs)
+            return await func(*args, **kwargs)
         return wrapper
     return decorator

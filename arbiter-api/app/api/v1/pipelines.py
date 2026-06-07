@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_org, get_db
 from app.api.role_guard import require_owner
 from app.schemas.pipeline import DagDefinitionRead, PipelineCreate, PipelineDetail, PipelineRead, PipelineRunSummary
-from app.services.pipeline_service import create_pipeline, get_pipeline, get_pipeline_runs, list_pipelines
+from app.services.pipeline_service import create_pipeline, delete_pipeline, get_pipeline, get_pipeline_runs, list_pipelines
 
 router = APIRouter()
 
@@ -65,3 +65,14 @@ async def read_pipeline_runs(
     if pipeline is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
     return await get_pipeline_runs(db, pipeline.id, limit, offset)
+
+
+@router.delete("/{pipeline_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pipeline_endpoint(
+    pipeline_id: str,
+    current_org=Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    deleted = await delete_pipeline(db, pipeline_id, current_org.id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")

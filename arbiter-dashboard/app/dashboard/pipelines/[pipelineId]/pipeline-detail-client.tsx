@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from 'next/navigation';
 import { useState } from "react";
 import { DagGraph } from "@/components/dag-graph";
 import { StatusBadge } from "@/components/status-badge";

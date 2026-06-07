@@ -12,13 +12,19 @@ class AirflowClient:
     password: str
 
     def _client(self) -> httpx.Client:
-        if not hasattr(self, "_cached_client"):
+        if not hasattr(self, "_cached_client") or self._cached_client is None:
             self._cached_client = httpx.Client(
                 base_url=self.base_url.rstrip("/"),
                 auth=(self.username, self.password),
                 timeout=15.0,
             )
         return self._cached_client
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
 
     def close(self) -> None:
         if hasattr(self, "_cached_client") and self._cached_client is not None:

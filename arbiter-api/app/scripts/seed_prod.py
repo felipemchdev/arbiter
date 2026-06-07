@@ -35,8 +35,13 @@ async def main() -> None:
         result = await session.execute(select(Organization).limit(1))
         org = result.scalar_one_or_none()
         if org is None:
-            print("[seed:prod] No org found — run seed_dev first")
-            return
+            from app.core.security import generate_raw_api_key, hash_api_key
+            raw_api_key = generate_raw_api_key()
+            org = Organization(name="default", api_key=hash_api_key(raw_api_key))
+            session.add(org)
+            await session.flush()
+            print("[seed:prod] Org created: default")
+            print(f"[seed:prod] API Key (SDK/Collector): {raw_api_key}")
 
         users = [
             {"email": admin_user, "password": admin_pass, "role": "owner"},

@@ -75,16 +75,25 @@ jobs:
         run: |
           docker build -t arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }} ./arbiter-dashboard
           docker push arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}
+      - name: Set secrets in Azure Container App
+        run: |
+          az containerapp secret set \
+            --name arbiter-api --resource-group rg-eeip \
+            --secrets \
+            arbiter-admin-user="${{ secrets.ARBITER_ADMIN_USER }}" \
+            arbiter-admin-password="${{ secrets.ARBITER_ADMIN_PASSWORD }}" \
+            arbiter-viewer-user="${{ secrets.ARBITER_VIEWER_USER }}" \
+            arbiter-viewer-password="${{ secrets.ARBITER_VIEWER_PASSWORD }}"
       - name: Deploy API
         run: |
           az containerapp update \
             --name arbiter-api --resource-group rg-eeip \
             --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} \
             --set-env-vars \
-            ARBITER_ADMIN_USER="${{ secrets.ARBITER_ADMIN_USER }}" \
-            ARBITER_ADMIN_PASSWORD="${{ secrets.ARBITER_ADMIN_PASSWORD }}" \
-            ARBITER_VIEWER_USER="${{ secrets.ARBITER_VIEWER_USER }}" \
-            ARBITER_VIEWER_PASSWORD="${{ secrets.ARBITER_VIEWER_PASSWORD }}"
+            ARBITER_ADMIN_USER=secretref:arbiter-admin-user \
+            ARBITER_ADMIN_PASSWORD=secretref:arbiter-admin-password \
+            ARBITER_VIEWER_USER=secretref:arbiter-viewer-user \
+            ARBITER_VIEWER_PASSWORD=secretref:arbiter-viewer-password
       - name: Deploy Worker
         run: az containerapp update --name arbiter-worker --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
       - name: Deploy Dashboard

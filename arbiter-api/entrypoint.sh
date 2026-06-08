@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+echo "[bootstrap] Running migrations..."
+alembic upgrade head
+
 if [ "${RUN_SEEDS:-false}" = "true" ]; then
   echo "[bootstrap] Running OSS seeds..."
   python -m app.scripts.seed_dev
@@ -11,7 +14,7 @@ fi
 
 if [ -n "${ARBITER_ADMIN_USER}" ] && [ -n "${ARBITER_ADMIN_PASSWORD}" ]; then
   echo "[bootstrap] Running production user upsert..."
-  #python -m app.scripts.seed_prod
+  python -m app.scripts.seed_prod
 else
   echo "[bootstrap] Skipping production user upsert (env vars not set)"
 fi

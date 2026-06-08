@@ -24,26 +24,26 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     logger.info("lifespan: startup begin")
 
-    alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
-    alembic_cfg = AlembicConfig(str(alembic_ini))
+    #alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
+    #alembic_cfg = AlembicConfig(str(alembic_ini))
 
-    try:
-        logger.info("lifespan: before migrations")
+    #try:
+        #logger.info("lifespan: before migrations")
 
-        loop = asyncio.get_running_loop()
+        #loop = asyncio.get_running_loop()
 
-        await loop.run_in_executor(
-            None,
-            lambda: command.upgrade(alembic_cfg, "head"),
-        )
+        #await loop.run_in_executor(
+            #None,
+            #lambda: command.upgrade(alembic_cfg, "head"),
+        #)
 
-        logger.info("lifespan: migrations completed")
+        #logger.info("lifespan: migrations completed")
 
-    except Exception:
-        logger.exception("lifespan: migration failed")
-        raise
+    #except Exception:
+        #logger.exception("lifespan: migration failed")
+        #raise
 
-    logger.info("lifespan: before yield")
+    #logger.info("lifespan: before yield")
 
     yield
 

@@ -6,7 +6,6 @@
 
 [Português](#pt-br) · [English](#en)
 
-
 ---
 
 ## PT-BR

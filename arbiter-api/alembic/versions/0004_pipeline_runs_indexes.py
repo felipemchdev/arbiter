@@ -15,13 +15,12 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-def upgrade() -> None:
-    op.create_index("ix_pipeline_runs_started_at", "pipeline_runs", ["started_at"])
-    op.create_index("ix_pipeline_runs_status", "pipeline_runs", ["status"])
-    op.create_index("ix_pipeline_runs_pipeline_id_status", "pipeline_runs", ["pipeline_id", "status"])
+def upgrade():
+    op.create_index(
+        "ix_pipeline_runs_pipeline_id_status",
+        "pipeline_runs",
+        ["pipeline_id", "status"],
+    )
 
-
-def downgrade() -> None:
+def downgrade():
     op.drop_index("ix_pipeline_runs_pipeline_id_status")
-    op.drop_index("ix_pipeline_runs_status")
-    op.drop_index("ix_pipeline_runs_started_at")

@@ -22,26 +22,10 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    alembic_ini = Path(__file__).resolve().parent.parent / "alembic.ini"
-    alembic_cfg = AlembicConfig(str(alembic_ini))
-
-    try:
-        logger.info("lifespan: running alembic migrations")
-
-        loop = asyncio.get_running_loop()
-
-        await loop.run_in_executor(
-            None,
-            lambda: command.upgrade(alembic_cfg, "head"),
-        )
-
-        logger.info("lifespan: migrations completed successfully")
-
-    except Exception:
-        logger.exception("lifespan: migration failed - aborting startup")
-        raise
-
+    logger.info("lifespan startup")
     yield
+
+    logger.info("lifespan shutdown")
 
 
 app = FastAPI(
@@ -74,3 +58,5 @@ app.include_router(
     v1_router,
     prefix=settings.api_v1_str,
 )
+
+logger.info("app: initialization completed")

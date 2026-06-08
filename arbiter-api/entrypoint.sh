@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+echo "[bootstrap] Running migrations..."
+alembic upgrade head
+
 if [ "${RUN_SEEDS:-false}" = "true" ]; then
   echo "[bootstrap] Running OSS seeds..."
   python -m app.scripts.seed_dev

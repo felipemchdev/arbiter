@@ -30,7 +30,6 @@ async def main() -> None:
         print("[seed:prod] Skipping — ARBITER_ADMIN_USER/PASSWORD not set")
         return
 
-    await init_models()
     async with async_session_maker() as session:
         result = await session.execute(select(Organization).limit(1))
         org = result.scalar_one_or_none()

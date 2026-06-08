@@ -16,9 +16,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_index("ix_pipeline_runs_started_at", "pipeline_runs", ["started_at"])
-    op.create_index("ix_pipeline_runs_status", "pipeline_runs", ["status"])
-    op.create_index("ix_pipeline_runs_pipeline_id_status", "pipeline_runs", ["pipeline_id", "status"])
+    pass
 
 
 def downgrade() -> None:

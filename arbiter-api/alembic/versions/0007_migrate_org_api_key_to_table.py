@@ -77,8 +77,16 @@ def upgrade():
                 },
             )
 
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [c["name"] for c in inspector.get_columns("organizations")]
+    if "api_key" not in columns:
+        return
+
     with op.batch_alter_table("organizations") as batch_op:
-        batch_op.drop_index("ix_organizations_api_key")
+        indexes = [i["name"] for i in inspector.get_indexes("organizations")]
+        if "ix_organizations_api_key" in indexes:
+            batch_op.drop_index("ix_organizations_api_key")
         batch_op.drop_column("api_key")
 
 

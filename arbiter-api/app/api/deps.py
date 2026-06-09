@@ -63,7 +63,12 @@ async def get_current_org(
         if org_id is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token payload")
 
-        result = await db.execute(select(Organization).where(Organization.id == UUID(org_id)))
+        try:
+            org_uuid = UUID(org_id)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token payload")
+
+        result = await db.execute(select(Organization).where(Organization.id == org_uuid))
         organization = result.scalar_one_or_none()
         if organization is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="organization not found")

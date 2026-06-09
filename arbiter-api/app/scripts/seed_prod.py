@@ -13,14 +13,6 @@ from app.models.user import User
 
 
 async def main() -> None:
-    """Upsert production admin/viewer users from environment variables.
-
-    Reads ARBITER_ADMIN_USER, ARBITER_ADMIN_PASSWORD, ARBITER_VIEWER_USER,
-    ARBITER_VIEWER_PASSWORD from env vars. Skips silently if not set.
-
-    These credentials are injected via GitHub Secrets in the deploy workflow
-    and NEVER committed to the repository.
-    """
     admin_user = os.getenv("ARBITER_ADMIN_USER", "").strip()
     admin_pass = os.getenv("ARBITER_ADMIN_PASSWORD", "").strip()
     viewer_user = os.getenv("ARBITER_VIEWER_USER", "").strip()
@@ -34,13 +26,10 @@ async def main() -> None:
         result = await session.execute(select(Organization).limit(1))
         org = result.scalar_one_or_none()
         if org is None:
-            from app.core.security import generate_raw_api_key, hash_api_key
-            raw_api_key = generate_raw_api_key()
-            org = Organization(name="default", api_key=hash_api_key(raw_api_key))
+            org = Organization(name="default")
             session.add(org)
             await session.flush()
             print("[seed:prod] Org created: default")
-            print(f"[seed:prod] API Key (SDK/Collector): {raw_api_key}")
 
         users = [
             {"email": admin_user, "password": admin_pass, "role": "owner"},

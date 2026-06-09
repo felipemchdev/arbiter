@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,14 +15,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.api.deps import get_db
 from app.core.database import Base
-from app.core.security import hash_api_key
+from app.core.security import hash_password
 from app.main import app
 from app.models.alert import Alert
+from app.models.api_key import ApiKey
 from app.models.dag_definition import DagDefinition
 from app.models.organization import Organization
 from app.models.pipeline import Pipeline, PipelineSource, RunStatus
 from app.models.pipeline_run import PipelineRun
 from app.models.task_instance import TaskInstance, TaskStatus
+from app.models.user import User
 
 TEST_DB_PATH = Path("./arbiter_test.db")
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./arbiter_test.db"
@@ -66,20 +69,35 @@ async def session() -> AsyncIterator[AsyncSession]:
 @pytest_asyncio.fixture
 async def organization(session: AsyncSession) -> Organization:
     unique_suffix = uuid4().hex[:8]
-    raw_api_key = f"arb_test_api_key_{unique_suffix}"
-    organization = Organization(name=f"acme_{unique_suffix}", api_key=hash_api_key(raw_api_key))
+    organization = Organization(name=f"acme_{unique_suffix}")
     session.add(organization)
     await session.commit()
     await session.refresh(organization)
-    organization._raw_api_key = raw_api_key  # type: ignore[attr-defined]
     return organization
 
 
 @pytest_asyncio.fixture
-async def auth_headers(client: AsyncClient, organization: Organization) -> dict[str, str]:
+async def owner_user(session: AsyncSession, organization: Organization) -> User:
+    email = f"owner+{uuid4().hex[:8]}@test.local"
+    user = User(
+        id=uuid.uuid4(),
+        email=email,
+        hashed_password=hash_password("testpass123"),
+        role="owner",
+        org_id=organization.id,
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    user._password = "testpass123"
+    return user
+
+
+@pytest_asyncio.fixture
+async def auth_headers(client: AsyncClient, owner_user: User) -> dict[str, str]:
     response = await client.post(
         "/api/v1/auth/token",
-        data={"username": organization.name, "password": organization._raw_api_key},  # type: ignore[attr-defined]
+        data={"username": owner_user.email, "password": owner_user._password},
     )
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

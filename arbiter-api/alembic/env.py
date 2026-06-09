@@ -17,10 +17,12 @@ if os.environ.get("ALEMBIC_ALLOW_DOWNGRADE") != "true" and any(arg.startswith("d
 from app.core.config import settings
 from app.core.database import Base
 from app.models.alert import Alert
+from app.models.api_key import ApiKey
 from app.models.dag_definition import DagDefinition
 from app.models.organization import Organization
 from app.models.pipeline import Pipeline
 from app.models.pipeline_run import PipelineRun
+from app.models.refresh_token import RefreshToken
 from app.models.task_instance import TaskInstance
 from app.models.user import User
 
@@ -64,4 +66,4 @@ async def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online()) 
+    asyncio.run(run_migrations_online())

@@ -8,9 +8,9 @@ from app.services.auth_service import (
     authenticate_user,
     build_refresh_token,
     build_user_access_token,
+    consume_refresh_token,
     revoke_user_refresh_tokens,
-    rotate_refresh_token,
-    verify_and_consume_refresh_token,
+    verify_and_rotate_refresh_token,
 )
 
 router = APIRouter()
@@ -45,8 +45,7 @@ async def refresh_access_token(
     body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    user, old_rt = await verify_and_consume_refresh_token(db, body.refresh_token)
-    new_raw, _ = await rotate_refresh_token(db, old_rt)
+    user, new_raw = await verify_and_rotate_refresh_token(db, body.refresh_token)
     return {
         "access_token": build_user_access_token(user),
         "refresh_token": new_raw,
@@ -59,6 +58,6 @@ async def logout(
     body: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    user, old_rt = await verify_and_consume_refresh_token(db, body.refresh_token)
+    user = await consume_refresh_token(db, body.refresh_token)
     await revoke_user_refresh_tokens(db, user.id)
     return {"detail": "logged out"}

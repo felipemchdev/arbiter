@@ -53,31 +53,12 @@ async def build_refresh_token(session: AsyncSession, user: User) -> str:
     return f"{jti}.{raw_token}"
 
 
-async def rotate_refresh_token(session: AsyncSession, old_refresh: RefreshToken) -> tuple[str, str]:
-    old_refresh.revoked = True
-    session.add(old_refresh)
-
-    raw_token, expires_at = create_refresh_token()
-    jti = str(uuid.uuid4())
-    hashed = hash_refresh_token(raw_token)
-
-    new_refresh = RefreshToken(
-        user_id=old_refresh.user_id,
-        jti=jti,
-        hashed_token=hashed,
-        expires_at=expires_at,
-    )
-    session.add(new_refresh)
-    await session.commit()
-    return f"{jti}.{raw_token}", jti
-
-
-async def verify_and_consume_refresh_token(session: AsyncSession, token_str: str) -> tuple[User, RefreshToken]:
+async def _lookup_refresh_token(session: AsyncSession, token_str: str) -> tuple[RefreshToken, str]:
+    """Find and validate a refresh token. Returns (token_row, raw_token_part). Does NOT commit."""
     from datetime import UTC, datetime
 
     now = datetime.now(UTC)
 
-    # SQLite stores DateTime(timezone=True) as naive, so normalize for comparison
     def _ensure_aware(dt):
         if dt and dt.tzinfo is None:
             return dt.replace(tzinfo=UTC)
@@ -86,9 +67,7 @@ async def verify_and_consume_refresh_token(session: AsyncSession, token_str: str
     parts = token_str.split(".", 1)
     if len(parts) == 2:
         jti, raw_token = parts[0], parts[1]
-        result = await session.execute(
-            select(RefreshToken).where(RefreshToken.jti == jti)
-        )
+        result = await session.execute(select(RefreshToken).where(RefreshToken.jti == jti))
         rt = result.scalar_one_or_none()
         if rt is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
@@ -98,20 +77,56 @@ async def verify_and_consume_refresh_token(session: AsyncSession, token_str: str
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token expired")
         if not verify_refresh_token(raw_token, rt.hashed_token):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
-    else:
-        # Fallback: O(N) scan for legacy tokens without jti prefix
-        result = await session.execute(select(RefreshToken))
-        for rt in result.scalars():
-            if rt.revoked:
-                continue
-            if _ensure_aware(rt.expires_at) < now:
-                continue
-            if verify_refresh_token(token_str, rt.hashed_token):
-                break
-        else:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
+        return rt, raw_token
 
-    rt.last_used_at = now
+    # Fallback: O(N) scan for legacy tokens without jti prefix
+    result = await session.execute(select(RefreshToken))
+    for rt in result.scalars():
+        if rt.revoked:
+            continue
+        if _ensure_aware(rt.expires_at) < now:
+            continue
+        if verify_refresh_token(token_str, rt.hashed_token):
+            return rt, token_str
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
+
+
+async def verify_and_rotate_refresh_token(session: AsyncSession, token_str: str) -> tuple[User, str]:
+    """Validate a refresh token, revoke it, issue a new one. Single commit."""
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+
+    old_rt, _ = await _lookup_refresh_token(session, token_str)
+    old_rt.revoked = True
+    old_rt.last_used_at = now
+    session.add(old_rt)
+
+    raw_token, expires_at = create_refresh_token()
+    jti = str(uuid.uuid4())
+    hashed = hash_refresh_token(raw_token)
+    new_rt = RefreshToken(
+        user_id=old_rt.user_id,
+        jti=jti,
+        hashed_token=hashed,
+        expires_at=expires_at,
+    )
+    session.add(new_rt)
+    await session.commit()
+
+    user_result = await session.execute(select(User).where(User.id == old_rt.user_id))
+    user = user_result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+    return user, f"{jti}.{raw_token}"
+
+
+async def consume_refresh_token(session: AsyncSession, token_str: str) -> User:
+    """Validate a refresh token and mark it as used. Single commit. Used by logout."""
+    from datetime import UTC, datetime
+
+    rt, _ = await _lookup_refresh_token(session, token_str)
+    rt.last_used_at = datetime.now(UTC)
     session.add(rt)
     await session.commit()
 
@@ -119,7 +134,7 @@ async def verify_and_consume_refresh_token(session: AsyncSession, token_str: str
     user = user_result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
-    return user, rt
+    return user
 
 
 async def revoke_user_refresh_tokens(session: AsyncSession, user_id: uuid.UUID) -> None:

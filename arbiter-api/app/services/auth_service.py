@@ -133,14 +133,15 @@ async def consume_refresh_token(session: AsyncSession, token_str: str) -> User:
     from datetime import UTC, datetime
 
     rt, _ = await _lookup_refresh_token(session, token_str)
-    rt.last_used_at = datetime.now(UTC)
-    session.add(rt)
-    await session.commit()
 
     user_result = await session.execute(select(User).where(User.id == rt.user_id))
     user = user_result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+
+    rt.last_used_at = datetime.now(UTC)
+    session.add(rt)
+    await session.commit()
     return user
 
 
@@ -233,13 +234,18 @@ async def delete_api_key(session: AsyncSession, key_id: uuid.UUID, org_id: uuid.
 async def lookup_api_key(session: AsyncSession, raw_key: str) -> ApiKey | None:
     from datetime import UTC, datetime
 
+    def _ensure_aware(dt):
+        if dt and dt.tzinfo is None:
+            return dt.replace(tzinfo=UTC)
+        return dt
+
     now = datetime.now(UTC)
     prefix = raw_key[:12] if len(raw_key) >= 12 else raw_key
     result = await session.execute(
         select(ApiKey).where(ApiKey.prefix == prefix, ApiKey.revoked == False)  # noqa: E712
     )
     for ak in result.scalars():
-        if ak.expires_at is not None and ak.expires_at < now:
+        if ak.expires_at is not None and _ensure_aware(ak.expires_at) < now:
             continue
         if verify_api_key(raw_key, ak.hashed_key):
             return ak

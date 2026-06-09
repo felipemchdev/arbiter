@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import redis.asyncio as aioredis
 from fastapi import Request, Response
@@ -9,6 +10,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -23,7 +26,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             self._redis = aioredis.from_url(settings.redis_url, decode_responses=True)
         return self._redis
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:
         if request.url.path in ("/api/v1/health", "/api/v1/docs"):
             return await call_next(request)
 
@@ -37,9 +40,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             pipe = redis.pipeline()
             pipe.zremrangebyscore(key, 0, window_start)
             pipe.zcard(key)
-            pipe.zadd(key, {str(now): now})
-            pipe.expire(key, self.window_seconds + 1)
-            _, current, _, _ = await pipe.execute()
+            _, current = await pipe.execute()
 
             if current >= self.max_requests:
                 return Response(
@@ -47,7 +48,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     status_code=429,
                     media_type="application/json",
                 )
+
+            pipe = redis.pipeline()
+            pipe.zadd(key, {str(now): now})
+            pipe.expire(key, self.window_seconds + 1)
+            await pipe.execute()
         except Exception:
-            pass
+            logger.exception("rate_limit_failure client_ip=%s path=%s", client_ip if 'client_ip' in dir() else "unknown", request.url.path)
 
         return await call_next(request)

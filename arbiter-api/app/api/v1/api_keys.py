@@ -50,23 +50,19 @@ async def create_key(
 
 @router.post("/{key_id}/revoke")
 async def revoke_key(
-    key_id: str,
+    key_id: UUID,
     current_org: Organization = Depends(require_owner),
     db: AsyncSession = Depends(get_db),
 ):
-    from uuid import UUID
-
-    await revoke_api_key(db, UUID(key_id), current_org.id)
+    await revoke_api_key(db, key_id, current_org.id)
     return {"detail": "api key revoked"}
 
 
 @router.delete("/{key_id}")
 async def delete_key(
-    key_id: str,
+    key_id: UUID,
     current_org: Organization = Depends(require_owner),
     db: AsyncSession = Depends(get_db),
 ):
-    from uuid import UUID
-
-    await delete_api_key(db, UUID(key_id), current_org.id)
+    await delete_api_key(db, key_id, current_org.id)
     return {"detail": "api key deleted"}

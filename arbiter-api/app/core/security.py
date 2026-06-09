@@ -52,7 +52,7 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     try:
         return _argon2.verify(hashed, plain)
-    except VerificationError:
+    except (VerificationError, InvalidHashError):
         return False
 
 

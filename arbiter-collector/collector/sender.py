@@ -15,7 +15,7 @@ class ArbiterSender:
     def send(self, payload: dict) -> bool:
         try:
             response = httpx.post(
-                f"{self.api_url}/api/v1/collector/airflow/sync",
+                f"{self.api_url}/api/v1/runs/ingest",
                 json=payload,
                 headers={"X-API-Key": self.api_key},
                 timeout=30.0,

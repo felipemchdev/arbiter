@@ -74,3 +74,21 @@ export interface Metrics {
   active_pipelines: number;
   avg_duration_ms: number;
 }
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  environment: string;
+  prefix: string;
+  scopes: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked: boolean;
+  expires_at: string | null;
+}
+
+export interface ApiKeyCreated {
+  api_key: string;
+  prefix: string;
+  id: string;
+}

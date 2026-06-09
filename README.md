@@ -25,11 +25,12 @@
                           │                               │                               │
                           ▼                               ▼                               ▼
                    ┌──────────────┐              ┌──────────────┐              ┌──────────────────┐
-                   │  PostgreSQL  │              │    Redis     │              │  Celery Worker   │
-                   │  pipelines   │              │  broker +    │              │  + Beat          │
-                   │  runs        │              │  result      │              │  check_stale     │
-                   │  tasks       │              │  backend     │              │  a cada 10 min   │
-                   │  alerts      │              └──────────────┘              └──────────────────┘
+                   │  SQLite /    │              │    Redis     │              │  Celery Worker   │
+                   │  PostgreSQL  │              │  broker +    │              │  + Beat          │
+                   │  pipelines   │              │  result      │              │  check_stale     │
+                   │  runs        │              │  backend     │              │  a cada 10 min   │
+                   │  tasks       │              └──────────────┘              └──────────────────┘
+                   │  alerts      │
                    └──────┬───────┘
                           │
                           │  GET /api/v1/*
@@ -49,12 +50,14 @@
 | `arbiter-dashboard` | 3000  | Frontend Next.js - DAG interativo (ReactFlow), metricas, timeline, alertas, tema dark/light |
 | `arbiter-worker`    | -     | Celery worker + beat - executa `check_stale_pipelines` a cada 10 min                       |
 | `arbiter-redis`     | 6379  | Redis 7 - broker e result backend do Celery                                                |
-| `postgres`          | 5432  | PostgreSQL 15 - fonte unica de verdade                                                     |
+| `sqlite / postgres`  | 5432* | SQLite (default local) ou PostgreSQL 15 (Docker/producao) - fonte unica de verdade          |
+
+> *Porta 5432 apenas quando usando PostgreSQL via Docker
 
 ### Fluxo de dados
 
 1. Um sistema externo (Airflow, Azure Function, script Python, cron job) faz `POST` com dados da run
-2. A API persiste pipeline, run, tasks e DAG no PostgreSQL em uma transacao atomica
+2. A API persiste pipeline, run, tasks e DAG no banco (SQLite ou PostgreSQL) em uma transacao atomica
 3. No mesmo request, processa o evento inline: calcula `duration_ms`, atualiza `last_run_status`, cria alerta de `failure` se necessario
 4. O dashboard consulta a API e renderiza tudo em tempo real
 5. A cada 10 min, o Celery Beat dispara `check_stale_pipelines` - varre pipelines sem runs em 24h e cria alertas `no_run`

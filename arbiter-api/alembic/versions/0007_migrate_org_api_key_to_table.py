@@ -31,7 +31,7 @@ def upgrade():
             org_name = row[1]
             old_hash = row[2]
             migrated_name = f"{org_name} (migrated)"
-            prefix = "arb_migrated_"
+            prefix = "arb_migrated"
             new_id = str(uuid.uuid4())
             conn.execute(
                 sa.text(
@@ -69,7 +69,7 @@ def upgrade():
                     "org_id": org_id,
                     "name": migrated_name,
                     "environment": "production",
-                    "prefix": "arb_migrated_",
+                    "prefix": "arb_migrated",
                     "hashed_key": old_hash,
                     "scopes": "collector:write",
                     "created_at": now,

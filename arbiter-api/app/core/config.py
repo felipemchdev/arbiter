@@ -53,6 +53,20 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v
 
+    @field_validator("access_token_expire_minutes", "refresh_token_expire_days")
+    @classmethod
+    def _check_positive_ttl(cls, v: int, info) -> int:
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive integer")
+        return v
+
+    @field_validator("auth_mode")
+    @classmethod
+    def _check_auth_mode(cls, v: str) -> str:
+        if v not in ("jwt_api_keys", "jwt", "api_keys"):
+            raise ValueError(f"invalid auth_mode '{v}'. allowed: jwt_api_keys, jwt, api_keys")
+        return v
+
     def model_post_init(self, __context) -> None:
         if self.secret_key == "change-me-in-production":
             logger.warning("Using default SECRET_KEY - set ARBITER_SECRET_KEY env var for production.")

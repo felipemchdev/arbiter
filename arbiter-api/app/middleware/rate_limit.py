@@ -20,10 +20,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._redis: aioredis.Redis | None = None
+        self._disabled = False
 
-    async def _get_redis(self) -> aioredis.Redis:
+    async def _get_redis(self) -> aioredis.Redis | None:
+        if self._disabled:
+            return None
         if self._redis is None:
-            self._redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+            try:
+                self._redis = aioredis.from_url(
+                    settings.redis_url, decode_responses=True, socket_connect_timeout=3
+                )
+            except Exception:
+                logger.warning("rate_limit_disabled redis_unavailable")
+                self._disabled = True
+                return None
         return self._redis
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:
@@ -32,6 +42,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         try:
             redis = await self._get_redis()
+            if redis is None:
+                return await call_next(request)
+
             client_ip = request.client.host if request.client else "unknown"
             key = f"ratelimit:{client_ip}"
             now = time.time()
@@ -54,6 +67,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             pipe.expire(key, self.window_seconds + 1)
             await pipe.execute()
         except Exception:
-            logger.exception("rate_limit_failure client_ip=%s path=%s", client_ip if 'client_ip' in dir() else "unknown", request.url.path)
+            logger.exception("rate_limit_failure path=%s", request.url.path)
 
         return await call_next(request)

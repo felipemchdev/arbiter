@@ -15,17 +15,21 @@ export default function ApiKeysPage() {
   const [environment, setEnvironment] = useState("test");
   const [newKey, setNewKey] = useState<ApiKeyCreated | null>(null);
   const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchKeys = () => {
     if (!token) return;
     setLoading(true);
-    listApiKeys(token).then(setKeys).finally(() => setLoading(false));
+    listApiKeys(token).then(setKeys).catch(() => {}).finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchKeys(); }, [token]);
 
   const handleCreate = async () => {
-    if (!token || !name.trim()) return;
+    if (!token || !name.trim() || submitting) return;
+    setError(null);
+    setSubmitting(true);
     try {
       const created = await createApiKey(name.trim(), environment, token);
       setNewKey(created);
@@ -33,6 +37,9 @@ export default function ApiKeysPage() {
       fetchKeys();
     } catch (e) {
       console.error("Failed to create API key", e);
+      setError(e instanceof Error ? e.message : "Failed to create API key");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -172,20 +179,32 @@ export default function ApiKeysPage() {
                   ))}
                 </div>
               </div>
+              {error && (
+                <div style={{
+                  padding: '8px 12px', borderRadius: 'var(--r-md)',
+                  fontSize: 12, fontWeight: 500,
+                  fontFamily: "'DM Sans', sans-serif",
+                  color: 'var(--danger)',
+                  background: 'var(--danger-muted)',
+                  border: '1px solid var(--danger-muted)',
+                }}>
+                  {error}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={handleCreate} disabled={!name.trim()} style={{
+                <button onClick={handleCreate} disabled={!name.trim() || submitting} style={{
                   padding: '6px 16px', borderRadius: 'var(--r-md)',
                   fontSize: 12, fontWeight: 600,
                   fontFamily: "'DM Sans', sans-serif",
-                  background: name.trim() ? 'var(--accent)' : 'var(--bg-surface)',
-                  border: `1px solid ${name.trim() ? 'var(--accent)' : 'var(--border)'}`,
-                  color: name.trim() ? 'white' : 'var(--text-muted)',
-                  cursor: name.trim() ? 'pointer' : 'default',
+                  background: name.trim() && !submitting ? 'var(--accent)' : 'var(--bg-surface)',
+                  border: `1px solid ${name.trim() && !submitting ? 'var(--accent)' : 'var(--border)'}`,
+                  color: name.trim() && !submitting ? 'white' : 'var(--text-muted)',
+                  cursor: name.trim() && !submitting ? 'pointer' : 'default',
                   transition: 'all var(--duration-fast) var(--ease)',
                 }}>
-                  Create key
+                  {submitting ? "Creating..." : "Create key"}
                 </button>
-                <button onClick={() => { setCreating(false); setName(""); }} style={{
+                <button onClick={() => { setCreating(false); setName(""); setError(null); }} style={{
                   padding: '6px 16px', borderRadius: 'var(--r-md)',
                   fontSize: 12, fontWeight: 500,
                   fontFamily: "'DM Sans', sans-serif",

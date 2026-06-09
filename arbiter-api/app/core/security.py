@@ -41,7 +41,7 @@ def hash_refresh_token(raw_token: str) -> str:
 def verify_refresh_token(raw_token: str, hashed_token: str) -> bool:
     try:
         return _argon2.verify(hashed_token, raw_token)
-    except VerificationError:
+    except (VerificationError, InvalidHashError):
         return False
 
 

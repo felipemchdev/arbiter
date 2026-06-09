@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_org, get_db
+from app.api.deps import get_current_user, get_db
+from app.models.user import User
 from app.services.auth_service import (
     authenticate_user,
     build_refresh_token,
     build_user_access_token,
+    change_password,
     consume_refresh_token,
     revoke_user_refresh_tokens,
     verify_and_rotate_refresh_token,
@@ -24,6 +26,11 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 @router.post("/token", response_model=TokenResponse)
@@ -61,3 +68,13 @@ async def logout(
     user = await consume_refresh_token(db, body.refresh_token)
     await revoke_user_refresh_tokens(db, user.id)
     return {"detail": "logged out"}
+
+
+@router.post("/change-password")
+async def change_password_endpoint(
+    body: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await change_password(db, current_user, body.current_password, body.new_password)
+    return {"detail": "password changed - all sessions invalidated"}

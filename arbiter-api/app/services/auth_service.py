@@ -13,6 +13,7 @@ from app.core.security import (
     generate_raw_api_key,
     hash_api_key,
     hash_refresh_token,
+    hash_password,
     verify_api_key,
     verify_password,
     verify_refresh_token,
@@ -47,6 +48,7 @@ async def build_refresh_token(session: AsyncSession, user: User) -> str:
         jti=jti,
         hashed_token=hashed,
         expires_at=expires_at,
+        token_version=user.token_version,
     )
     session.add(refresh)
     await session.commit()
@@ -102,22 +104,27 @@ async def verify_and_rotate_refresh_token(session: AsyncSession, token_str: str)
     old_rt.last_used_at = now
     session.add(old_rt)
 
-    raw_token, expires_at = create_refresh_token()
-    jti = str(uuid.uuid4())
-    hashed = hash_refresh_token(raw_token)
-    new_rt = RefreshToken(
-        user_id=old_rt.user_id,
-        jti=jti,
-        hashed_token=hashed,
-        expires_at=expires_at,
-    )
-    session.add(new_rt)
-    await session.commit()
-
     user_result = await session.execute(select(User).where(User.id == old_rt.user_id))
     user = user_result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+
+    if old_rt.token_version != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token version mismatch - re-login required")
+
+    raw_token, expires_at = create_refresh_token()
+    jti = str(uuid.uuid4())
+    hashed = hash_refresh_token(raw_token)
+    new_rt = RefreshToken(
+        user_id=user.id,
+        jti=jti,
+        hashed_token=hashed,
+        expires_at=expires_at,
+        token_version=user.token_version,
+    )
+    session.add(new_rt)
+    await session.commit()
+
     return user, f"{jti}.{raw_token}"
 
 
@@ -135,6 +142,24 @@ async def consume_refresh_token(session: AsyncSession, token_str: str) -> User:
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
     return user
+
+
+async def change_password(session: AsyncSession, user: User, current_password: str, new_password: str) -> None:
+    if not verify_password(current_password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="current password is incorrect")
+
+    user.hashed_password = hash_password(new_password)
+    user.token_version += 1
+    session.add(user)
+
+    result = await session.execute(
+        select(RefreshToken).where(RefreshToken.user_id == user.id, RefreshToken.revoked == False)  # noqa: E712
+    )
+    for rt in result.scalars():
+        rt.revoked = True
+        session.add(rt)
+
+    await session.commit()
 
 
 async def revoke_user_refresh_tokens(session: AsyncSession, user_id: uuid.UUID) -> None:

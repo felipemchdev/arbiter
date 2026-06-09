@@ -11,12 +11,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.core.security import decode_access_token
 from app.models.organization import Organization
+from app.models.user import User
 from app.services.auth_service import lookup_api_key
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
     async for session in get_session():
         yield session
+
+
+async def get_current_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    authorization: str | None = Header(default=None),
+) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="bearer token required")
+    token = authorization.split(" ", 1)[1]
+    try:
+        payload = decode_access_token(token)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token") from exc
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid token payload")
+    result = await db.execute(select(User).where(User.id == UUID(sub)))
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+    return user
 
 
 async def get_current_org(

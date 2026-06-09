@@ -168,11 +168,12 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
                           │                               │                               │
                           ▼                               ▼                               ▼
                    ┌──────────────┐              ┌──────────────┐              ┌──────────────────┐
-                   │  PostgreSQL  │              │    Redis     │              │  Celery Worker   │
-                   │  pipelines   │              │  broker +    │              │  + Beat          │
-                   │  runs        │              │  result      │              │  check_stale     │
-                   │  tasks       │              │  backend     │              │  every 10 min    │
-                   │  alerts      │              └──────────────┘              └──────────────────┘
+                   │  SQLite /    │              │    Redis     │              │  Celery Worker   │
+                   │  PostgreSQL  │              │  broker +    │              │  + Beat          │
+                   │  pipelines   │              │  result      │              │  check_stale     │
+                   │  runs        │              │  backend     │              │  every 10 min    │
+                   │  tasks       │              └──────────────┘              └──────────────────┘
+                   │  alerts      │
                    └──────┬───────┘
                           │
                           │  GET /api/v1/*
@@ -192,12 +193,14 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
 | `arbiter-dashboard` | 3000 | Next.js frontend - interactive DAG (ReactFlow), metrics, timeline, alerts, dark/light theme |
 | `arbiter-worker`    | -    | Celery worker + beat - runs `check_stale_pipelines` every 10 min                            |
 | `arbiter-redis`     | 6379 | Redis 7 - Celery broker and result backend                                                  |
-| `postgres`          | 5432 | PostgreSQL 15 - single source of truth                                                      |
+| `sqlite / postgres`  | 5432* | SQLite (default local) or PostgreSQL 15 (Docker/production) - single source of truth        |
+
+> *Port 5432 only when using PostgreSQL via Docker
 
 ### Data flow
 
 1. An external system (Airflow DAG, Azure Function, Python script, cron job) POSTs run data to the API
-2. The API persists pipeline, run, tasks, and DAG definition in PostgreSQL in a single atomic transaction
+2. The API persists pipeline, run, tasks, and DAG definition in the database (SQLite or PostgreSQL) in a single atomic transaction
 3. In the same request, it processes the event inline: computes `duration_ms`, updates `last_run_status`, creates a `failure` alert if needed
 4. The dashboard queries the API and renders everything in real time
 5. Every 10 min, Celery Beat triggers `check_stale_pipelines` - scans for pipelines with no runs in 24h and creates `no_run` alerts

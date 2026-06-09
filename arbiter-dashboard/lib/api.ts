@@ -3,33 +3,47 @@ import type { Alert, ApiKey, ApiKeyCreated, Pipeline, PipelineRun, TaskInstance 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export async function apiGet<T>(path: string, token: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`GET ${path} failed: ${response.status}`);
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`GET ${path} failed: ${response.status}`);
+    }
+    return response.json() as Promise<T>;
+  } catch (e) {
+    if (e instanceof TypeError && e.message === "Failed to fetch") {
+      throw new Error(`Cannot reach API at ${API_URL}. Is the API running?`);
+    }
+    throw e;
   }
-  return response.json() as Promise<T>;
 }
 
 export async function apiPost<T>(path: string, body: unknown, token: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`POST ${path} failed: ${response.status}`);
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`POST ${path} failed: ${response.status}`);
+    }
+    return response.json() as Promise<T>;
+  } catch (e) {
+    if (e instanceof TypeError && e.message === "Failed to fetch") {
+      throw new Error(`Cannot reach API at ${API_URL}. Is the API running?`);
+    }
+    throw e;
   }
-  return response.json() as Promise<T>;
 }
 
 export async function apiPut<T>(path: string, body: unknown, token: string): Promise<T> {

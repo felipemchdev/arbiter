@@ -3,12 +3,29 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "arbiter"
+name = "arbiter-sdk"
 version = "0.1.0"
-description = "Arbiter SDK"
+description = "Python SDK for Arbiter — pipeline observability platform"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.12"
+authors = [
+  { name = "Felipe Machado", email = "felipemch@outlook.com" }
+]
+keywords = ["observability", "data engineering", "pipelines", "monitoring"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = ["httpx>=0.27,<1.0", "pydantic>=2.7,<3.0"]
+
+[project.urls]
+Homepage = "https://github.com/felipemchdev/arbiter"
+Repository = "https://github.com/felipemchdev/arbiter"
+"Bug Tracker" = "https://github.com/felipemchdev/arbiter/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

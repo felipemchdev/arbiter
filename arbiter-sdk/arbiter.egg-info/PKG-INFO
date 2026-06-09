@@ -1,0 +1,32 @@
+Metadata-Version: 2.4
+Name: arbiter
+Version: 0.1.0
+Summary: Arbiter SDK
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: httpx<1.0,>=0.27
+Requires-Dist: pydantic<3.0,>=2.7
+
+# Arbiter SDK
+
+Python instrumentation library for reporting pipeline runs to Arbiter.
+
+## Install
+
+```sh
+pip install -e ./arbiter-sdk
+```
+
+## Usage
+
+```python
+from arbiter import Arbiter
+
+arb = Arbiter(api_key="arb_xxx", pipeline="my_pipeline")
+
+@arb.monitor
+def my_function():
+    ...
+```
+
+See the root README for the full Arbiter quickstart.

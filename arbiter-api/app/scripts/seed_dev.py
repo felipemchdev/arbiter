@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.core.database import async_session_maker, init_models
 from app.core.security import generate_raw_api_key, hash_api_key, hash_password
+from app.models.api_key import ApiKey
 from app.models.organization import Organization
 from app.models.user import User
 
@@ -14,21 +15,28 @@ from app.models.user import User
 async def main() -> None:
     await init_models()
     async with async_session_maker() as session:
-        # Create org if not exists
         result = await session.execute(select(Organization).limit(1))
         org = result.scalar_one_or_none()
 
         if org is None:
-            raw_api_key = generate_raw_api_key()
-            org = Organization(name="default", api_key=hash_api_key(raw_api_key))
+            org = Organization(name="default")
             session.add(org)
             await session.flush()
-            print(f"[seed] Org created: default")
+            print("[seed] Org created: default")
+
+            raw_api_key = generate_raw_api_key("development")
+            api_key = ApiKey(
+                org_id=org.id,
+                name="Default Collector Key",
+                environment="development",
+                prefix=raw_api_key[:12],
+                hashed_key=hash_api_key(raw_api_key),
+            )
+            session.add(api_key)
             print(f"[seed] API Key (SDK/Collector): {raw_api_key}")
         else:
             print("[seed] Org already exists: default")
 
-        # Create fixed users
         users = [
             {"email": "admin@arbiter", "password": "arbiter26@", "role": "owner"},
             {"email": "viewer@arbiter", "password": "arbiter26@", "role": "viewer"},

@@ -90,6 +90,10 @@ jobs:
             --name arbiter-api --resource-group rg-eeip \
             --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} \
             --set-env-vars \
+            ACCESS_TOKEN_EXPIRE_MINUTES=15 \
+            REFRESH_TOKEN_EXPIRE_DAYS=30 \
+            AUTH_MODE=jwt_api_keys \
+            API_KEYS_ENABLED=true \
             ARBITER_ADMIN_USER=secretref:arbiter-admin-user \
             ARBITER_ADMIN_PASSWORD=secretref:arbiter-admin-password \
             ARBITER_VIEWER_USER=secretref:arbiter-viewer-user \

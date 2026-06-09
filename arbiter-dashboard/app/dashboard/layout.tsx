@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/dashboard',            label: 'Overview'  },
   { href: '/dashboard/pipelines',  label: 'Pipelines' },
   { href: '/dashboard/alerts',     label: 'Alerts'    },
+  { href: '/dashboard/api-keys',   label: 'API Keys'  },
 ]
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

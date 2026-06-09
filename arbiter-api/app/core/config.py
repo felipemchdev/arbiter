@@ -18,7 +18,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./arbiter.db"
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str = "change-me-in-production"
-    access_token_expire_minutes: int = 1440
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 30
+    refresh_token_rotation_enabled: bool = True
+    auth_mode: str = "jwt_api_keys"
+    api_keys_enabled: bool = True
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
     cors_origins: Union[str, List[str]] = "http://localhost:3000"

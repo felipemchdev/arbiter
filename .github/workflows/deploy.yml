@@ -93,9 +93,6 @@ jobs:
             --name arbiter-api --resource-group rg-eeip \
             --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} \
             --set-env-vars \
-            SECRET_KEY="${{ secrets.SECRET_KEY }}" \
-            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
-            REDIS_URL="${{ secrets.REDIS_URL }}" \
             ACCESS_TOKEN_EXPIRE_MINUTES=15 \
             REFRESH_TOKEN_EXPIRE_DAYS=30 \
             AUTH_MODE=jwt_api_keys \

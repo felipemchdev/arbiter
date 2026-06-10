@@ -36,7 +36,7 @@ def build_payload(airflow_client: AirflowClient) -> dict:
                     "status": run.get("state") or run.get("status", "running"),
                     "started_at": run.get("start_date") or run.get("started_at"),
                     "finished_at": run.get("end_date") or run.get("finished_at"),
-                    "duration_ms": run.get("duration_ms"),
+                    "duration_ms": int((run.get("duration_ms") or run.get("duration") or 0) * 1000) if (run.get("duration_ms") or run.get("duration")) else None,
                     "error_message": run.get("error_message"),
                     "tasks": [
                         {
@@ -44,7 +44,7 @@ def build_payload(airflow_client: AirflowClient) -> dict:
                             "status": ti.get("state") or ti.get("status", "running"),
                             "started_at": ti.get("start_date") or ti.get("started_at"),
                             "finished_at": ti.get("end_date") or ti.get("finished_at"),
-                            "duration_ms": ti.get("duration_ms") or ti.get("duration"),
+                            "duration_ms": int((ti.get("duration_ms") or ti.get("duration") or 0) * 1000) if (ti.get("duration_ms") or ti.get("duration")) else None,
                             "try_number": ti.get("try_number", 1),
                             "log_url": ti.get("log_url"),
                             "error_message": ti.get("error_message"),

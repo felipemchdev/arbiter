@@ -1,16 +1,13 @@
 from contextlib import asynccontextmanager
-import asyncio
 import logging
-from pathlib import Path
 
-from alembic import command
-from alembic.config import Config as AlembicConfig
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
 from app.core.exceptions import install_exception_handlers
+from app.middleware.rate_limit import RateLimitMiddleware
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,6 +40,8 @@ app = FastAPI(
     license_info={"name": "MIT"},
     lifespan=lifespan,
 )
+
+app.add_middleware(RateLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

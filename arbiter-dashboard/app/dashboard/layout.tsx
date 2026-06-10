@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/dashboard',            label: 'Overview'  },
   { href: '/dashboard/pipelines',  label: 'Pipelines' },
   { href: '/dashboard/alerts',     label: 'Alerts'    },
+  { href: '/dashboard/api-keys',   label: 'API Keys'  },
 ]
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -45,7 +46,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </Link>
 
         <nav style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
-          {NAV_ITEMS.map(({ href, label }) => {
+          {NAV_ITEMS.filter(item => role === 'owner' || item.href !== '/dashboard/api-keys').map(({ href, label }) => {
             const active = href === '/dashboard'
               ? pathname === '/dashboard'
               : pathname.startsWith(href)

@@ -41,7 +41,10 @@ async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate
 
 
 async def get_pipeline(session: AsyncSession, pipeline_id, org_id) -> Pipeline | None:
-    pipeline_uuid = UUID(str(pipeline_id))
+    try:
+        pipeline_uuid = UUID(str(pipeline_id))
+    except ValueError:
+        return None
     result = await session.execute(
         select(Pipeline)
         .where(Pipeline.id == pipeline_uuid, Pipeline.org_id == org_id)
@@ -51,7 +54,10 @@ async def get_pipeline(session: AsyncSession, pipeline_id, org_id) -> Pipeline |
 
 
 async def get_pipeline_runs(session: AsyncSession, pipeline_id, limit: int, offset: int):
-    pipeline_uuid = UUID(str(pipeline_id))
+    try:
+        pipeline_uuid = UUID(str(pipeline_id))
+    except ValueError:
+        return []
     from app.models.pipeline_run import PipelineRun
 
     result = await session.execute(
@@ -74,13 +80,16 @@ async def upsert_dag_definition(session: AsyncSession, pipeline: Pipeline, nodes
         dag.edges = edges
         dag.updated_at = datetime.now(UTC)
     session.add(dag)
-    # NOTE: no commit here — caller is responsible for committing the transaction.
-    # This function is intentionally a unit-of-work participant, not a transaction owner.
     return dag
 
 async def delete_pipeline(db: AsyncSession, pipeline_id: str, org_id) -> bool:
     from uuid import UUID as _UUID
-    result = await db.execute(select(Pipeline).where(Pipeline.id == _UUID(pipeline_id), Pipeline.org_id == org_id))
+
+    try:
+        pid = _UUID(pipeline_id)
+    except ValueError:
+        return False
+    result = await db.execute(select(Pipeline).where(Pipeline.id == pid, Pipeline.org_id == org_id))
     pipeline = result.scalar_one_or_none()
     if pipeline is None:
         return False

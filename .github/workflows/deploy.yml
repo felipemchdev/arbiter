@@ -73,7 +73,10 @@ jobs:
           docker push arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
       - name: Build and push Dashboard
         run: |
-          docker build -t arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }} ./arbiter-dashboard
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
+            --build-arg NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" \
+            -t arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }} ./arbiter-dashboard
           docker push arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}
       - name: Set secrets in Azure Container App
         run: |
@@ -90,6 +93,11 @@ jobs:
             --name arbiter-api --resource-group rg-eeip \
             --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} \
             --set-env-vars \
+            ACCESS_TOKEN_EXPIRE_MINUTES=15 \
+            REFRESH_TOKEN_EXPIRE_DAYS=30 \
+            AUTH_MODE=jwt_api_keys \
+            API_KEYS_ENABLED=true \
+            CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
             ARBITER_ADMIN_USER=secretref:arbiter-admin-user \
             ARBITER_ADMIN_PASSWORD=secretref:arbiter-admin-password \
             ARBITER_VIEWER_USER=secretref:arbiter-viewer-user \

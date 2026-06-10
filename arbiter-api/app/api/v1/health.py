@@ -5,7 +5,7 @@ from sqlalchemy import cast, case, Date, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
-from app.core.redis import redis_client
+from app.core.redis import get_redis
 from app.models.pipeline import Pipeline, RunStatus
 from app.models.pipeline_run import PipelineRun
 
@@ -21,7 +21,11 @@ async def health(db: AsyncSession = Depends(get_db)):
     except Exception:  # noqa: BLE001
         db_ok = False
     try:
-        await redis_client.ping()
+        r = get_redis()
+        if r is not None:
+            await r.ping()
+        else:
+            redis_ok = False
     except Exception:  # noqa: BLE001
         redis_ok = False
     return {"status": "ok", "db": db_ok, "redis": redis_ok}
@@ -99,8 +103,6 @@ async def runs_per_day(
     )
     rows = result.all()
 
-    # func.date() retorna string "YYYY-MM-DD" no SQLite e date no PostgreSQL
-    # normaliza pra date em ambos os casos
     def to_date(val) -> date:
         if isinstance(val, str):
             return date.fromisoformat(val)

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
 
-from datetime import UTC, datetime
-
 
 async def test_alert_listing_and_resolve(client, auth_headers):
     payload = {
-        "pipeline": "helios-eeip",
+        "pipeline": "demo-pipeline",
         "source": "sdk",
         "run_id": "run-alert-1",
         "status": "failed",
@@ -22,8 +22,15 @@ async def test_alert_listing_and_resolve(client, auth_headers):
 
     response = await client.get("/api/v1/alerts", headers=auth_headers)
     assert response.status_code == 200
-    assert response.json()
+    body = response.json()
+    assert body["items"]
+    assert body["total"] >= 1
 
-    alert_id = response.json()[0]["id"]
+    alert_id = body["items"][0]["id"]
     response = await client.put(f"/api/v1/alerts/{alert_id}/resolve", headers=auth_headers)
     assert response.status_code == 200
+
+
+async def test_resolve_alert_with_malformed_uuid_returns_404(client, auth_headers):
+    response = await client.put("/api/v1/alerts/not-a-uuid/resolve", headers=auth_headers)
+    assert response.status_code == 404

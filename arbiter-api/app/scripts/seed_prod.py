@@ -13,6 +13,12 @@ from app.models.user import User
 
 
 async def main() -> None:
+    """Create the organization and the owner named by ``ARBITER_ADMIN_*``.
+
+    This is the only production bootstrap path: docker-compose.prod.yml requires
+    both variables, so an empty database always gets a login. An existing user is
+    left alone, which keeps a password changed in the product intact.
+    """
     admin_user = os.getenv("ARBITER_ADMIN_USER", "").strip()
     admin_pass = os.getenv("ARBITER_ADMIN_PASSWORD", "").strip()
     viewer_user = os.getenv("ARBITER_VIEWER_USER", "").strip()

@@ -66,11 +66,24 @@ async def main() -> None:
                 select(Pipeline).where(
                     Pipeline.dag_id == DAG_ID,
                     Pipeline.org_id == org.id,
-                    Pipeline.name == PIPELINE_NAME,
                 )
             )
         ).scalar_one_or_none()
         if pipeline is None:
+            # Matching on dag_id alone would let a pipeline that already owns this
+            # name but a different dag_id slip through, and the insert would put
+            # two identically named rows in front of the dashboard.
+            name_taken = (
+                await session.execute(
+                    select(Pipeline.id)
+                    .where(Pipeline.org_id == org.id, Pipeline.name == PIPELINE_NAME)
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+            if name_taken is not None:
+                print(f"[seed:demo] Name already used by another pipeline: {PIPELINE_NAME} - skipping.")
+                return
+
             pipeline = Pipeline(
                 id=uuid.uuid4(),
                 org_id=org.id,

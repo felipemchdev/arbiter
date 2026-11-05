@@ -35,6 +35,11 @@ services:
       # Overrides .env: a copied .env.example ships RUN_SEEDS=true for the local
       # quickstart, and demo org/users must never land in a production database.
       RUN_SEEDS: "false"
+      # The production bootstrap is the entrypoint's seed_prod upsert of this owner.
+      # Requiring both values means a fresh volume cannot start with no login; compose
+      # refuses to create the container when either one is missing.
+      ARBITER_ADMIN_USER: ${ARBITER_ADMIN_USER:?set ARBITER_ADMIN_USER in .env (owner login)}
+      ARBITER_ADMIN_PASSWORD: ${ARBITER_ADMIN_PASSWORD:?set ARBITER_ADMIN_PASSWORD in .env (owner password)}
     command: ["/entrypoint.sh"]
     restart: unless-stopped
 

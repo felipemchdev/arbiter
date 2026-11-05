@@ -6,29 +6,33 @@
 | ------- | ------------------ |
 | 0.x.x   | :white_check_mark: |
 
-## Before Any Internet-Facing Deployment
+## Before You Expose Arbiter to the Internet
 
-The repository ships no production credentials, but a deployment is only as safe
-as its `.env`. Before exposing Arbiter:
+This repository has no production credentials. Your `.env` decides if a
+deployment is safe. Do each item below before you make Arbiter reachable from
+the internet:
 
-- Set `SECRET_KEY` to a real value (`openssl rand -hex 32`). The API refuses to
-  boot with the built-in default when `ENVIRONMENT` is `staging` or `production`.
-- Set `POSTGRES_PASSWORD` and the password inside `DATABASE_URL`; both compose
-  files fail immediately if `POSTGRES_PASSWORD` is unset.
-- Replace `NEXTAUTH_SECRET` with a freshly generated value.
-- Run the dev seeds only locally (`RUN_SEEDS=true`). The seeded passwords and the
-  collector API key are printed to the container log once, so never keep a log
-  that contains them, and rotate any key you exposed.
-- `seed_prod.py` creates users but never overwrites an existing password; change
-  credentials in the product rather than by re-running the seed.
+- Set `SECRET_KEY` to a real value. Run `openssl rand -hex 32` to make one. When
+  `ENVIRONMENT` is `staging` or `production`, the API does not start with the
+  built-in default key.
+- Set `POSTGRES_PASSWORD`. Put the same password in `DATABASE_URL`. Both compose
+  files stop at once if `POSTGRES_PASSWORD` is not set.
+- Set `NEXTAUTH_SECRET` to a new value.
+- Use the dev seeds only on your own machine. Set `RUN_SEEDS=true` only for a
+  local run.
+- Delete the container logs that show a seeded password or the collector API key.
+  The seed prints each value once, at boot. Rotate any key that another person
+  could read.
+- Do not use `seed_prod.py` to change a password. That script makes users, but it
+  never overwrites a password that exists. Change the password in the product.
 
 ## Reporting a Vulnerability
 
-Do NOT open a public issue. Send details to the repository owner via private
-security advisory on GitHub. Review the [GitHub documentation][1] for how to
-submit a security advisory.
+Do not open a public issue. Send the details to the repository owner in a
+private security advisory on GitHub. The [GitHub documentation][1] explains how
+to submit one.
 
-You should receive a response within 48 hours. If the issue is confirmed,
-a patch will be released as soon as possible.
+You will get a response within 48 hours. If the owner confirms the problem, they
+will release a patch as soon as possible.
 
 [1]: https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability

@@ -11,6 +11,16 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_SECRET_KEY = "change-me-in-production"
 DEVELOPMENT_ENVIRONMENTS = ("development", "test", "local")
+PLACEHOLDER_SECRET_KEYS = ("", "secret", "changeme", "replaceme", "jwt-secret", "your-secret-key")
+MIN_SECRET_KEY_LENGTH = 32
+
+
+def _is_placeholder_secret(key: str) -> bool:
+    """True when the value is empty or still a template placeholder."""
+    normalised = (key or "").strip().lower()
+    if not normalised or normalised in PLACEHOLDER_SECRET_KEYS:
+        return True
+    return "change_me" in normalised or "change-me" in normalised
 
 
 class Settings(BaseSettings):
@@ -80,16 +90,22 @@ class Settings(BaseSettings):
         return v
 
     def model_post_init(self, __context) -> None:
-        if self.secret_key != DEFAULT_SECRET_KEY:
-            return
-        if self.environment in DEVELOPMENT_ENVIRONMENTS:
-            logger.warning("Using default SECRET_KEY - set SECRET_KEY env var before deploying.")
-            return
-        raise RuntimeError(
-            "SECRET_KEY is still the built-in default while ENVIRONMENT="
-            f"{self.environment!r}. Generate one with `openssl rand -hex 32` and set SECRET_KEY; "
-            "otherwise JWT access tokens can be forged by anyone who knows the default value."
-        )
+        production = self.environment not in DEVELOPMENT_ENVIRONMENTS
+        key = (self.secret_key or "").strip()
+        if _is_placeholder_secret(key):
+            if not production:
+                logger.warning("Using a placeholder SECRET_KEY - set SECRET_KEY before deploying.")
+                return
+            raise RuntimeError(
+                f"SECRET_KEY is empty or still a placeholder while ENVIRONMENT={self.environment!r}. "
+                "Generate one with `openssl rand -hex 32` and set SECRET_KEY; otherwise JWT access "
+                "tokens can be forged by anyone who knows the template value."
+            )
+        if production and len(key) < MIN_SECRET_KEY_LENGTH:
+            raise RuntimeError(
+                f"SECRET_KEY is only {len(key)} characters; a signing secret must be at least "
+                f"{MIN_SECRET_KEY_LENGTH} characters before running in {self.environment!r}."
+            )
 
 
 @lru_cache

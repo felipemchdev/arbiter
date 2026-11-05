@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 def _find_request(args, kwargs) -> Request | None:
+    """Locate the FastAPI Request among the handler arguments.
+
+    The limiter needs it for the client address and path. Handlers must declare a
+    `request: Request` parameter, otherwise the check is skipped rather than
+    silently limiting nobody.
+    """
     request = kwargs.get("request")
     if isinstance(request, Request):
         return request

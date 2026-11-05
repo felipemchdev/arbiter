@@ -20,4 +20,7 @@ else
 fi
 
 echo "[bootstrap] Starting API..."
+if [ "${RELOAD:-false}" = "true" ]; then
+  exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+fi
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000

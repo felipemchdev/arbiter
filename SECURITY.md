@@ -16,9 +16,10 @@ as its `.env`. Before exposing Arbiter:
 - Set `POSTGRES_PASSWORD` and the password inside `DATABASE_URL`; both compose
   files fail immediately if `POSTGRES_PASSWORD` is unset.
 - Replace `NEXTAUTH_SECRET` with a freshly generated value.
-- Run the dev seeds only locally (`RUN_SEEDS=true`). The seeded passwords and the
-  collector API key are printed to the container log once, so never keep a log
-  that contains them, and rotate any key you exposed.
+- Run the dev seeds only locally (`RUN_SEEDS=true`); `docker-compose.prod.yml`
+  overrides it to `false`. The seeded passwords and the collector API key are
+  printed to the container log once, so never keep a log that contains them, and
+  rotate any key you exposed.
 - `seed_prod.py` creates users but never overwrites an existing password; change
   credentials in the product rather than by re-running the seed.
 

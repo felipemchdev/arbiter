@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+echo "[bootstrap] Adopting schemas created without Alembic history..."
+python -m app.scripts.adopt_baseline
+
 echo "[bootstrap] Running migrations..."
 alembic upgrade head
 

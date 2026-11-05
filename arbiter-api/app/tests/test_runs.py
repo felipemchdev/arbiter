@@ -140,3 +140,43 @@ async def test_run_tasks_accept_json_input_params(client, auth_headers):
     response = await client.get(f"/api/v1/runs/{run_id}/tasks", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()[0]["input_params"] == {"batch": "2026-11-05"}
+
+
+async def test_ingest_route_rate_limit_reaches_the_handler(client, auth_headers, monkeypatch):
+    """The decorator only works because the handler declares a Request parameter."""
+    from app.api import rate_limit as rate_limit_module
+
+    class FakePipeline:
+        def zremrangebyscore(self, *args):
+            pass
+
+        def zcard(self, *args):
+            pass
+
+        def zadd(self, *args):
+            pass
+
+        def expire(self, *args):
+            pass
+
+        async def execute(self):
+            return (0, 10_000)
+
+    class FakeRedis:
+        def pipeline(self):
+            return FakePipeline()
+
+    monkeypatch.setattr(rate_limit_module, "get_redis", lambda: FakeRedis())
+
+    response = await client.post(
+        "/api/v1/runs",
+        headers=auth_headers,
+        json={
+            "pipeline": "demo-pipeline",
+            "source": "sdk",
+            "run_id": "run-rate-limited",
+            "status": "success",
+            "started_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    assert response.status_code == 429

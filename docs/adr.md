@@ -1,14 +1,16 @@
 # Architecture Decision Records (ADRs)
 
-## ADR-001: Inline Event Processing
+## ADR-001: Process Each Event in the Ingest Request
 
-**Date:** 2026-06  
+**Date:** 2026-06
 **Status:** Accepted
 
-Events are processed inline during ingestion (same request/transaction),
-not deferred to Celery. The Celery worker only handles the periodic
-`check_stale_pipelines` scheduled task.
+The API processes each run event in the request that stores it. It does not
+send the event to Celery. The Celery worker only runs the periodic
+`check_stale_pipelines` task.
 
-**Rationale:** Keeps event-to-alert latency near-zero. The Celery
-`process_run_event` task exists as an escape hatch for manual
-reprocessing but is not called automatically.
+**Reason:** The user sees the alert for a failed run as soon as the run page
+opens. No queue and no worker have to be up for that alert to exist.
+
+The `process_run_event` Celery task still exists. An operator can start it by
+hand to process a run again. No code starts it automatically.

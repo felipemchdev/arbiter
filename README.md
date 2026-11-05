@@ -44,23 +44,28 @@
 
 ### Componentes
 
-| Servico             | Porta | Descricao                                                                                  |
-| ------------------- | ----- | ------------------------------------------------------------------------------------------ |
-| `arbiter-api`       | 8000  | API REST - ingestao de runs, metricas, autenticacao JWT + API keys                         |
-| `arbiter-dashboard` | 3000  | Frontend Next.js - DAG interativo (ReactFlow), metricas, timeline, alertas, tema dark/light |
-| `arbiter-worker`    | -     | Celery worker + beat - executa `check_stale_pipelines` a cada 10 min                       |
-| `arbiter-redis`     | 6379  | Redis 7 - broker e result backend do Celery                                                |
-| `sqlite / postgres`  | 5432* | SQLite (default local) ou PostgreSQL 15 (Docker/producao) - fonte unica de verdade          |
+| Servico             | Porta | Funcao                                                                       |
+| ------------------- | ----- | -------------------------------------------------------------------------------- |
+| `arbiter-api`       | 8000  | API REST. Guarda runs, valida usuarios e entrega metricas.                  |
+| `arbiter-dashboard` | 3000  | Interface Next.js. Mostra o DAG (ReactFlow), metricas, timeline e alertas.  |
+| `arbiter-worker`    | -     | Worker e Beat do Celery. Executa `check_stale_pipelines` a cada 10 minutos.  |
+| `arbiter-redis`     | 6379  | Redis 7. Guarda a fila do Celery e o resultado das tasks.                   |
+| `postgres`          | 5432  | PostgreSQL 15. Guarda pipelines, runs, tasks e alertas.                      |
 
-> *Porta 5432 apenas quando usando PostgreSQL via Docker
+Use a porta 5432 somente quando o Docker executa o PostgreSQL. Uma execucao
+local sem Docker usa SQLite.
 
 ### Fluxo de dados
 
-1. Um sistema externo (Airflow, Azure Function, script Python, cron job) faz `POST` com dados da run
-2. A API persiste pipeline, run, tasks e DAG no banco (SQLite ou PostgreSQL) em uma transacao atomica
-3. No mesmo request, processa o evento inline: calcula `duration_ms`, atualiza `last_run_status`, cria alerta de `failure` se necessario
-4. O dashboard consulta a API e renderiza tudo em tempo real
-5. A cada 10 min, o Celery Beat dispara `check_stale_pipelines` - varre pipelines sem runs em 24h e cria alertas `no_run`
+1. Um sistema externo envia os dados da run para a API. Esse sistema pode ser
+   o Airflow, uma Azure Function, um script Python ou um cron job.
+2. A API salva o pipeline, a run, as tasks e o DAG em uma unica transacao. Se
+   uma escrita falha, a API nao salva nada.
+3. No mesmo request, a API define `duration_ms` e `last_run_status`.
+4. A API cria um alerta `failure` quando uma task daquela run falhou.
+5. O dashboard le os dados na API. A run nova aparece assim que a API a salva.
+6. O Celery Beat executa `check_stale_pipelines` a cada 10 minutos. Essa task
+   cria um alerta `no_run` para cada pipeline sem run ha 24 horas.
 
 ### Quick Start
 
@@ -69,42 +74,55 @@ git clone https://github.com/felipemchdev/arbiter.git
 cd arbiter
 cp .env.example .env
 docker compose up -d
-
-# Dashboard:  http://localhost:3000 (login: run `docker compose logs api | grep "User created"`)
-# API Docs:   http://localhost:8000/docs
-# API Health: http://localhost:8000/api/v1/health
 ```
+
+- Dashboard: http://localhost:3000
+- Documentacao da API: http://localhost:8000/docs
+- Health endpoint: http://localhost:8000/api/v1/health
+
+O repositorio nao tem senha padrao. A seed de desenvolvimento imprime a senha de
+login uma vez. Veja Credenciais padrao abaixo.
 
 ### Autenticacao
 
-A API aceita dois metodos simultaneos:
+Use um metodo por request. A API primeiro le o bearer token. Se nao houver
+bearer token, a API usa o header `X-API-Key`.
 
-| Metodo      | Uso                    | Fluxo                                                                 |
-| ----------- | ---------------------- | --------------------------------------------------------------------- |
-| **JWT**     | Dashboard (usuarios)   | Login -> access token (15 min) + refresh token com rotacao automatica |
-| **API Key** | Coletor / SDK / CI/CD  | Header `X-API-Key: arb_live_...` ou `arb_test_...`                    |
+| Metodo      | Use para | Como funciona |
+| ----------- | -------- | ------------- |
+| **JWT**     | Usuarios do dashboard | O usuario faz login. A API devolve um access token valido por 15 minutos e um refresh token. |
+| **API Key** | Coletor, SDK, jobs de CI/CD | O cliente envia a key no header `X-API-Key`. |
 
-Refresh tokens usam formato `jti.raw_token` - o `jti` permite lookup O(1) no banco.
-O dashboard renova o access token automaticamente e revoga todos os refresh tokens no logout.
+O refresh token tem duas partes: o id do token e o token. A API usa o id para
+achar a linha salva, entao nao faz varredura na tabela.
 
-API Keys sao gerenciadas via dashboard (`/dashboard/api-keys`) ou API (`POST /api/v1/api-keys`).
-Prefixos: `arb_live_` (producao) e `arb_test_` (desenvolvimento/teste).
+O dashboard renova o access token sozinho. Quando o usuario faz logout, a API
+revoga todos os refresh tokens daquele usuario.
+
+Crie e revogue API Keys no dashboard (`/dashboard/api-keys`) ou em
+`POST /api/v1/api-keys`. Uma key criada em producao comeca com `arb_live_`. Em
+qualquer outro ambiente, ela comeca com `arb_test_`.
 
 ### Credenciais padrao
 
-Nao existe senha padrao no repositorio. `seed_dev.py` gera uma senha aleatoria
-por usuario e a imprime uma unica vez no boot:
+O repositorio nao tem senha padrao. No boot, `seed_dev.py` cria uma senha
+aleatoria por usuario e a imprime uma unica vez:
 
 ```sh
 docker compose logs api | grep "User created"
 ```
 
-A seed de desenvolvimento tambem gera uma API key e exibe no log: `docker compose logs api | grep "API Key"`
+A seed de desenvolvimento tambem cria uma API key e a imprime:
 
-Para fixar as suas, defina `ARBITER_ADMIN_USER`, `ARBITER_ADMIN_PASSWORD`,
-`ARBITER_VIEWER_USER` e `ARBITER_VIEWER_PASSWORD` no `.env`.
+```sh
+docker compose logs api | grep "API Key"
+```
 
-### Enviando uma Run
+Para usar as suas senhas, defina `ARBITER_ADMIN_USER`, `ARBITER_ADMIN_PASSWORD`,
+`ARBITER_VIEWER_USER` e `ARBITER_VIEWER_PASSWORD` no `.env` antes do primeiro
+boot. Quando voce define a senha, a seed nao a imprime.
+
+### Procedimento: envie uma run
 
 ```sh
 curl -X POST http://localhost:8000/api/v1/runs/ingest \
@@ -136,6 +154,8 @@ curl -X POST http://localhost:8000/api/v1/runs/ingest \
 
 ### Desenvolvimento
 
+Execute cada bloco em um terminal separado.
+
 ```sh
 # API
 cd arbiter-api
@@ -152,11 +172,19 @@ cd arbiter-api
 celery -A app.workers.celery_app worker --loglevel=info
 ```
 
+A API precisa de um `DATABASE_URL`. Uma execucao local sem Docker usa SQLite. O
+worker tambem precisa de um Redis ativo, porque o Celery pega as tasks no Redis.
+
 ---
 
 ## EN
 
-Arbiter is a lightweight observability layer for data pipelines. It does **not** orchestrate, schedule, or execute anything. It receives run events via HTTP and displays DAGs, metrics, task timelines, and alerts.
+Arbiter is an observability tool for data pipelines. Arbiter does not
+orchestrate, schedule or run your jobs. Another system runs them.
+
+You send Arbiter one event per pipeline run. You send that event over HTTP,
+with the SDK or with the collector. Arbiter stores the run and shows the DAG,
+the metrics, the task timeline and the alerts in a dashboard.
 
 ### Architecture
 
@@ -192,23 +220,29 @@ Arbiter is a lightweight observability layer for data pipelines. It does **not**
 
 ### Components
 
-| Service             | Port | Description                                                                                 |
-| ------------------- | ---- | ------------------------------------------------------------------------------------------- |
-| `arbiter-api`       | 8000 | Core REST API - run ingestion, metrics, JWT + API key auth                                  |
-| `arbiter-dashboard` | 3000 | Next.js frontend - interactive DAG (ReactFlow), metrics, timeline, alerts, dark/light theme |
-| `arbiter-worker`    | -    | Celery worker + beat - runs `check_stale_pipelines` every 10 min                            |
-| `arbiter-redis`     | 6379 | Redis 7 - Celery broker and result backend                                                  |
-| `sqlite / postgres`  | 5432* | SQLite (default local) or PostgreSQL 15 (Docker/production) - single source of truth        |
+| Service             | Port | Function                                                                              |
+| ------------------- | ---- | --------------------------------------------------------------------------------------- |
+| `arbiter-api`       | 8000 | REST API. It stores runs, checks users and serves metrics.                       |
+| `arbiter-dashboard` | 3000 | Next.js UI. It shows the DAG (ReactFlow), metrics, timelines and alerts.          |
+| `arbiter-worker`    | -    | Celery worker and Beat. It runs `check_stale_pipelines` every 10 minutes.         |
+| `arbiter-redis`     | 6379 | Redis 7. It holds the Celery queue and the task results.                          |
+| `postgres`          | 5432 | PostgreSQL 15. It stores pipelines, runs, tasks and alerts.                        |
 
-> *Port 5432 only when using PostgreSQL via Docker
+Use port 5432 only when Docker runs PostgreSQL. A local run without Docker uses
+SQLite.
 
 ### Data flow
 
-1. An external system (Airflow DAG, Azure Function, Python script, cron job) POSTs run data to the API
-2. The API persists pipeline, run, tasks, and DAG definition in the database (SQLite or PostgreSQL) in a single atomic transaction
-3. In the same request, it processes the event inline: computes `duration_ms`, updates `last_run_status`, creates a `failure` alert if needed
-4. The dashboard queries the API and renders everything in real time
-5. Every 10 min, Celery Beat triggers `check_stale_pipelines` - scans for pipelines with no runs in 24h and creates `no_run` alerts
+1. An external system sends run data to the API. That system can be Airflow, an
+   Azure Function, a Python script or a cron job.
+2. The API saves the pipeline, the run, the tasks and the DAG in one
+   transaction. If one write fails, the API saves nothing.
+3. In the same request, the API sets `duration_ms` and `last_run_status`.
+4. The API creates a `failure` alert when a task in that run failed.
+5. The dashboard reads the data from the API. The new run appears as soon as
+   the API saves it.
+6. Celery Beat runs `check_stale_pipelines` every 10 minutes. That task creates
+   a `no_run` alert for each pipeline with no run in 24 hours.
 
 ### Quick Start
 
@@ -217,42 +251,55 @@ git clone https://github.com/felipemchdev/arbiter.git
 cd arbiter
 cp .env.example .env
 docker compose up -d
-
-# Dashboard:  http://localhost:3000  (login: run `docker compose logs api | grep "User created"`)
-# API Docs:   http://localhost:8000/docs
-# API Health: http://localhost:8000/api/v1/health
 ```
+
+- Dashboard: http://localhost:3000
+- API docs: http://localhost:8000/docs
+- Health endpoint: http://localhost:8000/api/v1/health
+
+The repository has no default password. The dev seed prints the login password
+once. See Default Credentials below.
 
 ### Authentication
 
-The API accepts two authentication methods simultaneously:
+Use one method per request. The API checks the bearer token first. If no bearer
+token is present, the API uses the `X-API-Key` header.
 
-| Method      | Use                     | Flow                                                                   |
-| ----------- | ----------------------- | ---------------------------------------------------------------------- |
-| **JWT**     | Dashboard (human users) | Login -> access token (15 min) + refresh token with automatic rotation |
-| **API Key** | Collector / SDK / CI/CD | `X-API-Key: arb_live_...` or `arb_test_...` header                     |
+| Method      | Use it for | How it works |
+| ----------- | ---------- | ------------ |
+| **JWT**     | Dashboard users | The user logs in. The API returns an access token that lasts 15 minutes and a refresh token. |
+| **API Key** | The collector, the SDK, CI/CD jobs | The client sends the key in the `X-API-Key` header. |
 
-Refresh tokens use `jti.raw_token` format - the `jti` enables O(1) database lookup.
-The dashboard auto-refreshes the access token and revokes all refresh tokens on logout.
+A refresh token has two parts: the token id and the token itself. The API uses
+the token id to find the stored row, so it does not scan the table.
 
-API Keys are managed via dashboard (`/dashboard/api-keys`) or API (`POST /api/v1/api-keys`).
-Prefixes: `arb_live_` (production) and `arb_test_` (development/testing).
+The dashboard gets a new access token by itself. When a user logs out, the API
+revokes every refresh token of that user.
+
+Create and revoke API keys in the dashboard (`/dashboard/api-keys`) or with
+`POST /api/v1/api-keys`. A key made in production starts with `arb_live_`. A key
+made in any other environment starts with `arb_test_`.
 
 ### Default Credentials
 
-There is no default password in the repository. `seed_dev.py` generates a random
-password per user and prints it once at boot:
+The repository has no default password. On boot, `seed_dev.py` makes one random
+password per user and prints it once:
 
 ```sh
 docker compose logs api | grep "User created"
 ```
 
-The dev seed also generates an API key and prints it to the log: `docker compose logs api | grep "API Key"`
+The dev seed also makes an API key and prints it:
 
-To pin your own, set `ARBITER_ADMIN_USER`, `ARBITER_ADMIN_PASSWORD`,
-`ARBITER_VIEWER_USER` and `ARBITER_VIEWER_PASSWORD` in `.env`.
+```sh
+docker compose logs api | grep "API Key"
+```
 
-### Ingesting a Run
+To use your own passwords, set `ARBITER_ADMIN_USER`, `ARBITER_ADMIN_PASSWORD`,
+`ARBITER_VIEWER_USER` and `ARBITER_VIEWER_PASSWORD` in `.env` before the first
+boot. When you set a password, the seed does not print it.
+
+### Procedure: Send a run
 
 ```sh
 curl -X POST http://localhost:8000/api/v1/runs/ingest \
@@ -284,6 +331,8 @@ curl -X POST http://localhost:8000/api/v1/runs/ingest \
 
 ### Development
 
+Run each block in its own terminal.
+
 ```sh
 # API
 cd arbiter-api
@@ -299,6 +348,9 @@ npm run dev
 cd arbiter-api
 celery -A app.workers.celery_app worker --loglevel=info
 ```
+
+The API needs a `DATABASE_URL`. A local run without Docker uses SQLite. The
+worker also needs a running Redis, because Celery takes its tasks from Redis.
 
 ## License
 

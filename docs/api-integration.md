@@ -1,35 +1,96 @@
 # API Integration Guide
 
+This guide tells you how to send run data to the Arbiter API. It also tells you
+what the API returns.
+
 ## Authentication
 
-Two methods, mutually exclusive per request:
+Use one method per request. The API reads the `Authorization` header first. If
+that header has no bearer token, the API uses the `X-API-Key` header.
 
-1. **JWT** (dashboard users): `Authorization: Bearer <token>`
-2. **API Key** (SDK/collector): `X-API-Key: arb_xxx`
+| Method | Use it for | Header |
+| --- | --- | --- |
+| JWT | Dashboard users | `Authorization: Bearer <token>` |
+| API key | The collector, the SDK, CI/CD jobs | `X-API-Key: arb_test_xxx` |
+
+`AUTH_MODE` can disable one of the two methods:
+
+- `AUTH_MODE=api_keys` - the API returns 401 for every JWT.
+- `AUTH_MODE=jwt` - the API returns 401 for every API key.
+- `API_KEYS_ENABLED=false` - the API returns 401 for every API key.
+
+## API key scopes
+
+Each API key stores a comma separated list of scopes. A key with
+`collector:write` can send run data. A key with `org:admin` gets the owner role,
+so it can also manage pipelines, users and keys. The API checks the scope for
+the route. It returns 403 when the key does not have that scope.
+
+A new key gets `collector:write` only. Give a key more scopes only when a
+client needs them.
+
+## Status codes
+
+| Code | The API returns it when |
+| --- | --- |
+| 201 | The API stored a new run |
+| 401 | No credential, a bad token, a revoked key or a disabled method |
+| 403 | The user has the wrong role or the key has no required scope |
+| 422 | A payload field has the wrong type or an unknown value |
+| 429 | The caller passed the rate limit for that route |
 
 ## Endpoints
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| POST | /api/v1/auth/token | None | Login, returns JWT |
-| GET | /api/v1/health | None | Health check |
-| GET | /api/v1/metrics | JWT | Today's run stats |
-| GET | /api/v1/metrics/runs-per-day | JWT | 7-day time series |
-| GET | /api/v1/pipelines | JWT | List pipelines |
-| POST | /api/v1/runs | API Key | Ingest single run |
-| POST | /api/v1/runs/ingest | API Key | Ingest batch (DAGs + runs) |
-| GET | /api/v1/runs/:id | JWT | Run detail |
-| GET | /api/v1/runs/:id/tasks | JWT | Task instances |
-| GET | /api/v1/alerts | JWT | Active alerts |
-| PUT | /api/v1/alerts/:id/resolve | JWT (owner) | Resolve alert |
+| Method | Path | Who can call it | What the API returns |
+| --- | --- | --- | --- |
+| POST | /api/v1/auth/token | A user with a correct password | An access token and a refresh token |
+| POST | /api/v1/auth/refresh | A valid refresh token | A new token pair |
+| GET | /api/v1/health | Anyone | The API status and its dependencies |
+| GET | /api/v1/metrics | Any valid credential | Run counts for today |
+| GET | /api/v1/metrics/runs-per-day | Any valid credential | The run count for each of the last 7 days |
+| GET | /api/v1/pipelines | Any valid credential | One page of pipelines |
+| POST | /api/v1/pipelines | An owner | The new pipeline |
+| GET | /api/v1/pipelines/:id | Any valid credential | One pipeline with its DAG |
+| GET | /api/v1/pipelines/:id/runs | Any valid credential | One page of runs |
+| DELETE | /api/v1/pipelines/:id | An owner | Nothing (204) |
+| POST | /api/v1/runs | A key with `collector:write` | The stored run (201) |
+| POST | /api/v1/runs/ingest | A key with `collector:write` | The number of stored runs |
+| GET | /api/v1/runs/:id | Any valid credential | One run |
+| GET | /api/v1/runs/:id/tasks | Any valid credential | The task instances of that run |
+| GET | /api/v1/alerts | Any valid credential | One page of unresolved alerts |
+| PUT | /api/v1/alerts/:id/resolve | An owner | The resolved alert |
+| GET | /api/v1/api-keys | An owner | The keys of the organisation |
+| POST | /api/v1/api-keys | An owner | The new key, shown one time only |
+| POST | /api/v1/api-keys/:id/revoke | An owner | A confirmation message |
+| DELETE | /api/v1/api-keys/:id | An owner | A confirmation message |
 
-## Example: Ingest a Run
+## Rate limits
+
+The API limits writes per client address and per route:
+
+- `POST /api/v1/runs` - 120 requests in one minute.
+- `POST /api/v1/runs/ingest` - 30 requests in one minute.
+
+If you get 429, wait, then send the data again. Use the batch route when you
+have many runs. One batch request counts as one request.
+
+## Procedure: Send one run
+
+1. Open the API Keys page in the dashboard.
+2. Create a key with the `collector:write` scope. Copy the key. The dashboard
+   shows the key only once.
+3. Put that key in the `X-API-Key` header.
+4. Run the command below. The API stores the run and returns the count.
 
 ```sh
 curl -X POST http://localhost:8000/api/v1/runs/ingest \
-  -H "X-API-Key: arb_xxx" \
+  -H "X-API-Key: arb_test_xxx" \
   -H "Content-Type: application/json" \
-  -d '{"dags":[{...}]}'
+  -d '{"dags":[{"dag_id":"demo","name":"demo_pipeline","runs":[{...}]}]}'
 ```
 
-See the root README for a complete curl example.
+Every run needs `started_at`. The API computes `duration_ms` when the run also
+has `finished_at`. If a run has the same `run_id` as a stored run of that
+pipeline, the API updates the stored run. It does not create a second run.
+
+See the root README for a complete payload example.

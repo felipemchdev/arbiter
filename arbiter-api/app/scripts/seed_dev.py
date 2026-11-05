@@ -26,6 +26,11 @@ def _resolve_password(env_var: str) -> tuple[str, bool]:
 
 
 async def main() -> None:
+    """Create the local organization, collector key and two users, once each.
+
+    An existing user keeps its password: the seeder never re-hashes, so a password
+    changed from the dashboard survives a container restart.
+    """
     await init_models()
     async with async_session_maker() as session:
         result = await session.execute(select(Organization).limit(1))

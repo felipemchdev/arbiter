@@ -51,6 +51,7 @@ client needs them.
 | GET | /api/v1/pipelines | Any valid credential | One page of pipelines |
 | POST | /api/v1/pipelines | An owner | The new pipeline |
 | GET | /api/v1/pipelines/:id | Any valid credential | One pipeline with its DAG |
+| PATCH | /api/v1/pipelines/:id | An owner | The pipeline with the new budget |
 | GET | /api/v1/pipelines/:id/runs | Any valid credential | One page of runs |
 | DELETE | /api/v1/pipelines/:id | An owner | Nothing (204) |
 | POST | /api/v1/runs | A key with `collector:write` | The stored run (201) |
@@ -94,3 +95,26 @@ has `finished_at`. If a run has the same `run_id` as a stored run of that
 pipeline, the API updates the stored run. It does not create a second run.
 
 See the root README for a complete payload example.
+
+## Procedure: Set a duration budget
+
+1. Sign in to the dashboard as an owner.
+2. Open the pipeline page. The Duration budget card holds the budget in
+   milliseconds.
+3. Enter a value and select Save. The API stores the value on the pipeline.
+
+Use the API when you do not want the dashboard:
+
+```sh
+curl -X PATCH http://localhost:8000/api/v1/pipelines/<pipeline-id> \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"slow_threshold_ms": 60000}'
+```
+
+The value must be a whole number above zero. The API answers 422 for `0`, for a
+negative value, and for a value that is not a number.
+
+Send `"slow_threshold_ms": null` to remove the budget. The API then compares
+each run with the 95th percentile of the last successful runs of the same
+pipeline. It creates no alert while that history stays short.

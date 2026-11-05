@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
 from app.api.rate_limit import rate_limit
+from app.api.role_guard import require_scope
 from app.schemas.run import RunPayload, RunRead, TaskRead
 from app.schemas.collector import AirflowSyncPayload
 from app.services.run_service import get_run, ingest_run, list_tasks
@@ -14,7 +15,7 @@ router = APIRouter()
 @rate_limit(max_requests=120, window_seconds=60)
 async def ingest_run_endpoint(
     payload: RunPayload,
-    current_org=Depends(get_current_org),
+    current_org=Depends(require_scope("collector:write", "pipeline:read")),
     db: AsyncSession = Depends(get_db),
 ):
     return await ingest_run(db, current_org.id, payload)
@@ -24,7 +25,7 @@ async def ingest_run_endpoint(
 @rate_limit(max_requests=30, window_seconds=60)
 async def ingest_batch(
     payload: AirflowSyncPayload,
-    current_org=Depends(get_current_org),
+    current_org=Depends(require_scope("collector:write")),
     db: AsyncSession = Depends(get_db),
 ):
     ingested = 0

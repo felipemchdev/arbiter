@@ -9,15 +9,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SECRET_KEY = "change-me-in-production"
+DEVELOPMENT_ENVIRONMENTS = ("development", "test", "local")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     project_name: str = "Arbiter"
     api_v1_str: str = "/api/v1"
+    environment: str = "development"
     database_url: str = "sqlite+aiosqlite:///./arbiter.db"
     redis_url: str = "redis://localhost:6379/0"
-    secret_key: str = "change-me-in-production"
+    secret_key: str = DEFAULT_SECRET_KEY
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
     refresh_token_rotation_enabled: bool = True
@@ -67,9 +71,25 @@ class Settings(BaseSettings):
             raise ValueError(f"invalid auth_mode '{v}'. allowed: jwt_api_keys, jwt, api_keys")
         return v
 
+    @field_validator("environment")
+    @classmethod
+    def _check_environment(cls, v: str) -> str:
+        allowed = (*DEVELOPMENT_ENVIRONMENTS, "staging", "production")
+        if v not in allowed:
+            raise ValueError(f"invalid environment '{v}'. allowed: {', '.join(allowed)}")
+        return v
+
     def model_post_init(self, __context) -> None:
-        if self.secret_key == "change-me-in-production":
-            logger.warning("Using default SECRET_KEY - set ARBITER_SECRET_KEY env var for production.")
+        if self.secret_key != DEFAULT_SECRET_KEY:
+            return
+        if self.environment in DEVELOPMENT_ENVIRONMENTS:
+            logger.warning("Using default SECRET_KEY - set SECRET_KEY env var before deploying.")
+            return
+        raise RuntimeError(
+            "SECRET_KEY is still the built-in default while ENVIRONMENT="
+            f"{self.environment!r}. Generate one with `openssl rand -hex 32` and set SECRET_KEY; "
+            "otherwise JWT access tokens can be forged by anyone who knows the default value."
+        )
 
 
 @lru_cache

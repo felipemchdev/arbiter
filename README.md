@@ -183,6 +183,13 @@ Um banco SQLite criado por um seed antigo ja existe, entao o `create_all` nao
 adiciona a coluna nova `slow_threshold_ms`. Apague esse arquivo e rode o seed de
 novo, ou siga a mensagem de `app.scripts.adopt_baseline`.
 
+### Documentacao
+
+- `docs/architecture.md` - os componentes e o fluxo de dados.
+- `docs/api-integration.md` - como enviar runs e ler alertas pela API.
+- `docs/adr.md` - as decisoes de arquitetura e os motivos delas.
+- `docs/roadmap.md` - o que o Arbiter faz hoje e qual e o proximo trabalho.
+
 ---
 
 ## EN
@@ -367,6 +374,13 @@ worker also needs a running Redis, because Celery takes its tasks from Redis.
 A SQLite file that an older seed created already has the `pipelines` table, so
 `create_all` does not add the new `slow_threshold_ms` column. Delete that file
 and run the seed again, or follow the message from `app.scripts.adopt_baseline`.
+
+### Documentation
+
+- `docs/architecture.md` - the components and the data flow.
+- `docs/api-integration.md` - how to send runs and how to read alerts.
+- `docs/adr.md` - the architecture decisions and their reasons.
+- `docs/roadmap.md` - what Arbiter does today and what work comes next.
 
 ## License
 

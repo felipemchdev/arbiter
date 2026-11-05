@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -18,6 +18,20 @@ class AlertType(str, enum.Enum):
 
 class Alert(Base):
     __tablename__ = "alerts"
+    # Mirrors alembic revision 0003 so that databases built by create_all - the test
+    # suite and every seed script - enforce the same alert deduplication as production.
+    __table_args__ = (
+        Index(
+            "uq_active_alert",
+            "pipeline_id",
+            "type",
+            "run_id",
+            "message",
+            unique=True,
+            postgresql_where=text("resolved = false"),
+            sqlite_where=text("resolved = 0"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     pipeline_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pipelines.id"), nullable=False, index=True)

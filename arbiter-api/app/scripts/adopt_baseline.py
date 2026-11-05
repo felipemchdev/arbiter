@@ -6,8 +6,10 @@ initial migration against tables that already exist, the process exits non-zero,
 and the container restart policy repeats that failure forever.
 
 The head revision is stamped only when the live schema already holds every model
-table and column. A partial schema is refused instead: stamping it would tell
-Alembic the database is current while the columns the app writes are missing.
+table, every model column and the uniqueness objects the application relies on.
+A partial schema is refused instead: stamping it would tell Alembic the database is
+current while a protection that later revisions add - the unique run key or the
+active-alert index - is still missing.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
+from sqlalchemy.schema import UniqueConstraint
 
 import app.models  # noqa: F401 - registers every table on Base.metadata
 from app.core.database import Base, engine
@@ -36,13 +39,38 @@ def _script_directory() -> ScriptDirectory:
     return ScriptDirectory.from_config(config)
 
 
-def _schema_gaps(inspector, tables: set[str]) -> list[str]:
-    """Describe why the live schema is not model-complete.
+def _uniqueness_guards(table) -> dict[str, str]:
+    """Return the named uniqueness objects a table must carry, by kind.
 
-    Only presence and nullability are compared. Column types come back as
-    dialect-specific objects that do not compare reliably across SQLite and
-    PostgreSQL, and a type mismatch is a repair the operator must review anyway.
+    Only objects that stop duplicate rows are required. Plain ``ix_*`` indexes are
+    performance-only, and a missing one is repaired by ``CREATE INDEX``, not by a
+    human decision. Column types stay unchecked: the driver returns dialect objects
+    that do not compare reliably between SQLite and PostgreSQL.
     """
+    guards: dict[str, str] = {}
+    for constraint in table.constraints:
+        if isinstance(constraint, UniqueConstraint) and constraint.name:
+            guards[constraint.name] = "unique constraint"
+    for index in table.indexes:
+        if index.unique and index.name:
+            guards[index.name] = "unique index"
+    return guards
+
+
+def _live_uniqueness(inspector, table_name: str) -> set[str]:
+    """Names of uniqueness objects the live schema reports for one table.
+
+    A driver may surface the same guard as either a constraint or an index, so both
+    are collected. Their presence also rules out the duplicate rows that the missing
+    guard would have rejected, which is why no data scan is needed.
+    """
+    names = {item["name"] for item in inspector.get_unique_constraints(table_name)}
+    names |= {item["name"] for item in inspector.get_indexes(table_name)}
+    return {name for name in names if name}
+
+
+def _schema_gaps(inspector, tables: set[str]) -> list[str]:
+    """Describe why the live schema is not model-complete."""
     gaps: list[str] = []
     for name, table in Base.metadata.tables.items():
         if name not in tables:
@@ -54,6 +82,10 @@ def _schema_gaps(inspector, tables: set[str]) -> list[str]:
                 gaps.append(f"column {name}.{column.name} is missing")
             elif bool(live[column.name]["nullable"]) != bool(column.nullable):
                 gaps.append(f"column {name}.{column.name} nullability differs")
+        present = _live_uniqueness(inspector, name)
+        for guard, kind in _uniqueness_guards(table).items():
+            if guard not in present:
+                gaps.append(f"{kind} {guard!r} on {name} is missing")
     return gaps
 
 

@@ -6,25 +6,22 @@
 | ------- | ------------------ |
 | 0.x.x   | :white_check_mark: |
 
-## Before You Expose Arbiter to the Internet
+## Before Any Internet-Facing Deployment
 
-This repository has no production credentials. Your `.env` decides if a
-deployment is safe. Do each item below before you make Arbiter reachable from
-the internet:
+The repository ships no production credentials, but a deployment is only as safe
+as its `.env`. Before exposing Arbiter:
 
-- Set `SECRET_KEY` to a real value. Run `openssl rand -hex 32` to make one. When
-  `ENVIRONMENT` is `staging` or `production`, the API does not start with the
-  built-in default key.
-- Set `POSTGRES_PASSWORD`. Put the same password in `DATABASE_URL`. Both compose
-  files stop at once if `POSTGRES_PASSWORD` is not set.
-- Set `NEXTAUTH_SECRET` to a new value.
-- Use the dev seeds only on your own machine. Set `RUN_SEEDS=true` only for a
-  local run.
-- Delete the container logs that show a seeded password or the collector API key.
-  The seed prints each value once, at boot. Rotate any key that another person
-  could read.
-- Do not use `seed_prod.py` to change a password. That script makes users, but it
-  never overwrites a password that exists. Change the password in the product.
+- Set `SECRET_KEY` to a real value (`openssl rand -hex 32`). The API refuses to
+  boot with the built-in default when `ENVIRONMENT` is `staging` or `production`.
+- Set `POSTGRES_PASSWORD` and the password inside `DATABASE_URL`; both compose
+  files fail immediately if `POSTGRES_PASSWORD` is unset.
+- Replace `NEXTAUTH_SECRET` with a freshly generated value.
+- Run the dev seeds only locally (`RUN_SEEDS=true`); `docker-compose.prod.yml`
+  overrides it to `false`. The seeded passwords and the collector API key are
+  printed to the container log once, so never keep a log that contains them, and
+  rotate any key you exposed.
+- `seed_prod.py` creates users but never overwrites an existing password; change
+  credentials in the product rather than by re-running the seed.
 
 ## Reporting a Vulnerability
 

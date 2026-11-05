@@ -62,6 +62,7 @@ export async function apiPut<T>(path: string, body: unknown, token: string): Pro
   return response.json() as Promise<T>;
 }
 
+/** GET a list endpoint, returning null when the API is unreachable or errors. */
 async function apiFetch<T>(path: string, token?: string, init: RequestInit = {}): Promise<T | null> {
   try {
     const response = await fetch(`${API_URL}${path}`, {
@@ -115,6 +116,7 @@ export async function resolveAlert(id: string, token?: string) {
   return await apiFetch(`/api/v1/alerts/${id}/resolve`, token, { method: "PUT" });
 }
 
+/** List pipelines; the API page envelope is unwrapped to its items here. */
 export async function getPipelines(token?: string, params?: { limit?: number; offset?: number }) {
   const query = new URLSearchParams();
   if (params?.limit !== undefined) query.set("limit", String(params.limit));

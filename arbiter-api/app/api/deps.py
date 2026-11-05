@@ -20,29 +20,35 @@ ADMIN_SCOPE = "org:admin"
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
+    """Yield the request-scoped async session."""
     async for session in get_session():
         yield session
 
 
 def _unauthorized(detail: str) -> HTTPException:
+    """Build a 401 with the WWW-Authenticate header FastAPI expects."""
     return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
 
 def _bearer_token(authorization: str | None) -> str | None:
+    """Extract the token from an `Authorization: Bearer ...` header, if present."""
     if not authorization or not authorization.lower().startswith("bearer "):
         return None
     return authorization.split(" ", 1)[1]
 
 
 def parse_scopes(raw: str | None) -> set[str]:
+    """Split the stored comma separated scope string into a set."""
     return {scope.strip() for scope in (raw or "").split(",") if scope.strip()}
 
 
 def role_from_scopes(scopes: set[str]) -> str:
+    """Map an API key's scopes to a role; only org:admin makes it owner."""
     return "owner" if ADMIN_SCOPE in scopes else "collector"
 
 
 async def _user_from_access_token(db: AsyncSession, token: str) -> tuple[User, dict[str, Any]]:
+    """Decode an access token and load its user, rejecting revoked versions."""
     try:
         payload = decode_access_token(token)
     except Exception as exc:

@@ -1,0 +1,2 @@
+# Scripts run inside Linux containers; CRLF would make /bin/sh fail on the shebang.
+*.sh text eol=lf

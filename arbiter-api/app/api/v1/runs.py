@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
@@ -14,20 +14,24 @@ router = APIRouter()
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
 @rate_limit(max_requests=120, window_seconds=60)
 async def ingest_run_endpoint(
+    request: Request,
     payload: RunPayload,
-    current_org=Depends(require_scope("collector:write", "pipeline:read")),
+    current_org=Depends(require_scope("collector:write")),
     db: AsyncSession = Depends(get_db),
 ):
+    """Accept one run and derive its status, duration and alerts inline."""
     return await ingest_run(db, current_org.id, payload)
 
 
 @router.post("/ingest")
 @rate_limit(max_requests=30, window_seconds=60)
 async def ingest_batch(
+    request: Request,
     payload: AirflowSyncPayload,
     current_org=Depends(require_scope("collector:write")),
     db: AsyncSession = Depends(get_db),
 ):
+    """Accept a collector sync: one run per Airflow dag run."""
     ingested = 0
     for dag in payload.dags:
         for run in dag.runs:

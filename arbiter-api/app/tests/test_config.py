@@ -127,9 +127,43 @@ class TestSecretKeyGuard:
         settings = Settings(  # type: ignore[call-arg]
             _env_file=None,
             environment="production",
-            secret_key="a-long-random-secret-value",
+            secret_key="a-long-random-secret-value-that-is-at-least-32-chars",
         )
-        assert settings.secret_key == "a-long-random-secret-value"
+        assert settings.secret_key == "a-long-random-secret-value-that-is-at-least-32-chars"
+
+    def test_empty_key_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            Settings(_env_file=None, environment="production", secret_key="   ")  # type: ignore[call-arg]
+
+    def test_documented_placeholder_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            Settings(  # type: ignore[call-arg]
+                _env_file=None,
+                environment="production",
+                secret_key="CHANGE_ME_run_openssl_rand_hex_32",
+            )
+
+    def test_short_key_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="at least"):
+            Settings(  # type: ignore[call-arg]
+                _env_file=None,
+                environment="production",
+                secret_key="short-but-not-a-placeholder",
+            )
+
+    def test_placeholder_only_warns_in_development(self, caplog):
+        settings = Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            environment="development",
+            secret_key="CHANGE_ME_run_openssl_rand_hex_32",
+        )
+        assert settings.secret_key == "CHANGE_ME_run_openssl_rand_hex_32"
 
     def test_unknown_environment_rejected(self):
         import pytest

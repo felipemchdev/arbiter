@@ -46,10 +46,12 @@ DAY_STATUSES = [
 
 
 def _run_id(day: datetime) -> str:
+    """Deterministic Airflow-style run id, so re-running the seed is a no-op."""
     return f"scheduled__{day:%Y-%m-%dT%H:%M:%S}"
 
 
 async def main() -> None:
+    """Create or refresh the demo pipeline and its last seven daily runs."""
     await init_models()
     async with async_session_maker() as session:
         org = (await session.execute(select(Organization).limit(1))).scalar_one_or_none()
@@ -57,8 +59,16 @@ async def main() -> None:
             print("[seed:demo] No organization found - run seed_dev first, skipping.")
             return
 
+        # Scoped to this org: dag_id is only unique per organisation, so an
+        # unscoped lookup could attach demo runs to another org's pipeline.
         pipeline = (
-            await session.execute(select(Pipeline).where(Pipeline.dag_id == DAG_ID))
+            await session.execute(
+                select(Pipeline).where(
+                    Pipeline.dag_id == DAG_ID,
+                    Pipeline.org_id == org.id,
+                    Pipeline.name == PIPELINE_NAME,
+                )
+            )
         ).scalar_one_or_none()
         if pipeline is None:
             pipeline = Pipeline(

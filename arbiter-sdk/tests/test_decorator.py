@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import queue
+import threading
 import time
 
-from arbiter.decorator import MAX_QUEUE_SIZE, Arbiter, _BackgroundDispatcher, _RunPayload
+import pytest
+
+from arbiter.decorator import (
+    MAX_QUEUE_SIZE,
+    SHUTDOWN_JOIN_SECONDS,
+    Arbiter,
+    _BackgroundDispatcher,
+    _RunPayload,
+)
 from arbiter.models import RunPayload
 
 
@@ -12,6 +21,21 @@ class DummyClient:
         self.sent: list[_RunPayload] = []
 
     def send_run(self, payload) -> bool:
+        self.sent.append(payload)
+        return True
+
+
+class BlockingClient:
+    """Stops inside send_run until the test releases it."""
+
+    def __init__(self) -> None:
+        self.sent: list[_RunPayload] = []
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def send_run(self, payload) -> bool:
+        self.entered.set()
+        self.release.wait(timeout=10)
         self.sent.append(payload)
         return True
 
@@ -69,16 +93,28 @@ def test_run_payload_generates_a_non_empty_run_id():
 
 
 def test_shutdown_does_not_block_when_queue_is_full():
-    dispatcher = _BackgroundDispatcher(DummyClient())
-    while True:
-        try:
+    """A parked worker and a full queue must still let shutdown return."""
+    client = BlockingClient()
+    dispatcher = _BackgroundDispatcher(client)
+    try:
+        # One payload parks the worker inside send_run, so the queue really fills.
+        dispatcher._queue.put_nowait(_payload())
+        assert client.entered.wait(1), "worker never reached the blocking send"
+        for _ in range(MAX_QUEUE_SIZE):
             dispatcher._queue.put_nowait(_payload())
-        except queue.Full:
-            break
+        assert dispatcher._queue.qsize() == MAX_QUEUE_SIZE
+        with pytest.raises(queue.Full):
+            dispatcher._queue.put_nowait(_payload())
 
-    started = time.monotonic()
-    dispatcher.shutdown()
-    elapsed = time.monotonic() - started
+        started = time.monotonic()
+        dispatcher.shutdown()
+        elapsed = time.monotonic() - started
 
-    assert elapsed < 10
-    assert not dispatcher._worker.is_alive()
+        # The sentinel cannot be queued, so shutdown gives up after its join
+        # timeout instead of blocking forever on a full queue.
+        assert elapsed < SHUTDOWN_JOIN_SECONDS + 2
+        assert dispatcher._worker.is_alive()
+    finally:
+        client.release.set()
+        dispatcher._worker.join(timeout=5)
+        assert not dispatcher._worker.is_alive()

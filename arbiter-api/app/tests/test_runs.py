@@ -147,6 +147,13 @@ async def test_ingest_route_rate_limit_reaches_the_handler(client, auth_headers,
     from app.api import rate_limit as rate_limit_module
 
     class FakePipeline:
+        """Queue the four window commands and answer with an over-limit count.
+
+        Each command only records that it was queued. ``execute`` returns the
+        MULTI/EXEC replies, whose last element is the count taken after the
+        insert, so the limiter sees a full window.
+        """
+
         def zremrangebyscore(self, *args):
             pass
 
@@ -160,11 +167,18 @@ async def test_ingest_route_rate_limit_reaches_the_handler(client, auth_headers,
             pass
 
         async def execute(self):
-            return (0, 10_000)
+            # MULTI/EXEC replies: prune, zadd, expire, then the post-insert count.
+            # The count is over the limit, so this request must be rejected.
+            return [0, 1, True, 10_000]
 
     class FakeRedis:
+        """Hand out the pipeline above and take the cleanup remove of a rejected call."""
+
         def pipeline(self):
             return FakePipeline()
+
+        async def zrem(self, *args):
+            pass
 
     monkeypatch.setattr(rate_limit_module, "get_redis", lambda: FakeRedis())
 

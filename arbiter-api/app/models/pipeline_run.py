@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -12,6 +12,11 @@ from app.models.pipeline import RunStatus
 
 class PipelineRun(Base):
     __tablename__ = "pipeline_runs"
+    # Mirrors alembic revision 0002 so that databases built by create_all - the test
+    # suite and every seed script - keep the same duplicate-run guard as production.
+    __table_args__ = (
+        UniqueConstraint("pipeline_id", "run_id", name="uq_pipeline_runs_pipeline_run_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     pipeline_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pipelines.id"), nullable=False, index=True)

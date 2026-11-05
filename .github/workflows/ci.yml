@@ -44,6 +44,160 @@ jobs:
       - name: Tests
         run: pytest app/tests -v
 
+  postgres:
+    name: Migrations on PostgreSQL
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arbiter-api
+    env:
+      DATABASE_URL: postgresql+asyncpg://arbiter:arbiter@localhost:5432/arbiter
+      SECRET_KEY: ci-only-value-not-a-secret
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: arbiter
+          POSTGRES_USER: arbiter
+          POSTGRES_PASSWORD: arbiter
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: arbiter-api/requirements.txt
+
+      - name: Install API deps
+        run: pip install -r requirements.txt
+
+      # A repeated CREATE TYPE aborts the upgrade, so this step is the regression
+      # check for the enum DDL of revision 0001.
+      - name: Fresh database migrates to head
+        run: |
+          python -m alembic upgrade head
+          python -m alembic upgrade head
+
+      - name: Create the seed database
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          import asyncpg
+
+
+          async def main() -> None:
+              conn = await asyncpg.connect(
+                  host="localhost", user="arbiter", password="arbiter", database="postgres"
+              )
+              await conn.execute("CREATE DATABASE arbiter_seed")
+              await conn.close()
+
+
+          asyncio.run(main())
+          PY
+
+      # The seeders build tables without an alembic_version row. The upgrade that
+      # follows must succeed, which is only true if adoption stamped the head.
+      - name: Baseline adoption stamps a schema built by create_all
+        env:
+          DATABASE_URL: postgresql+asyncpg://arbiter:arbiter@localhost:5432/arbiter_seed
+        run: |
+          python -c "import asyncio; from app.core.database import init_models; asyncio.run(init_models())"
+          python -m app.scripts.adopt_baseline
+          python -m alembic upgrade head
+
+      - name: Run uniqueness guard rejects a duplicate run key
+        env:
+          DATABASE_URL: postgresql+asyncpg://arbiter:arbiter@localhost:5432/arbiter_seed
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          import asyncpg
+
+          ORG = "00000000-0000-0000-0000-000000000001"
+          PIPELINE = "00000000-0000-0000-0000-000000000002"
+          FIRST_RUN = "00000000-0000-0000-0000-000000000003"
+          SECOND_RUN = "00000000-0000-0000-0000-000000000004"
+          INSERT_RUN = (
+              "INSERT INTO pipeline_runs (id, pipeline_id, run_id, status, started_at, created_at) "
+              "VALUES ($1, $2, 'ci-run', 'success', now(), now())"
+          )
+
+
+          async def main() -> None:
+              conn = await asyncpg.connect(
+                  host="localhost", user="arbiter", password="arbiter", database="arbiter_seed"
+              )
+              await conn.execute(
+                  "INSERT INTO organizations (id, name, created_at) VALUES ($1, 'ci', now())", ORG
+              )
+              await conn.execute(
+                  "INSERT INTO pipelines (id, org_id, name, source, created_at) "
+                  "VALUES ($1, $2, 'ci-pipeline', 'sdk', now())",
+                  PIPELINE,
+                  ORG,
+              )
+              await conn.execute(INSERT_RUN, FIRST_RUN, PIPELINE)
+              try:
+                  await conn.execute(INSERT_RUN, SECOND_RUN, PIPELINE)
+              except asyncpg.UniqueViolationError:
+                  print("duplicate (pipeline_id, run_id) rejected")
+              else:
+                  raise SystemExit("pipeline_runs accepted a duplicate (pipeline_id, run_id)")
+              await conn.close()
+
+
+          asyncio.run(main())
+          PY
+
+  redis:
+    name: Rate limiter under concurrency
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arbiter-api
+    env:
+      SECRET_KEY: ci-only-value-not-a-secret
+      TEST_REDIS_URL: redis://localhost:6379/0
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: arbiter-api/requirements.txt
+
+      - name: Install API deps
+        run: pip install -r requirements.txt
+
+      - name: Concurrent shared window
+        run: pytest app/tests/test_rate_limit_redis.py -v
+
   packages:
     runs-on: ubuntu-latest
     steps:

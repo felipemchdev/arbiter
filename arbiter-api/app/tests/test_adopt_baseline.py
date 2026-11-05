@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, inspect, text
 
 import app.models  # noqa: F401 - registers every table on Base.metadata
 from app.core.database import Base
-from app.scripts.adopt_baseline import _adopt, _script_directory
+from app.scripts.adopt_baseline import _adopt, _schema_gaps, _script_directory
 
 
 @pytest.fixture(scope="module")
@@ -37,6 +37,73 @@ def test_refuses_partial_schema(tmp_path, script_directory):
     with engine.connect() as connection:
         assert _adopt(connection, script_directory) == 1
         assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_schema_without_a_unique_index(tmp_path, script_directory):
+    """Alembic 0003 protects active alerts from duplicates; stamping must not skip it."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'no_alert_index.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+
+    with engine.connect() as connection:
+        gaps = _schema_gaps(inspect(connection), set(inspect(connection).get_table_names()))
+        assert "unique index 'uq_active_alert' on alerts is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+
+
+def test_refuses_schema_without_a_unique_constraint(tmp_path, script_directory):
+    """Alembic 0002 protects (pipeline_id, run_id); a schema without it is refused."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'no_run_guard.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE pipeline_runs RENAME TO pipeline_runs_guardless"))
+        connection.execute(
+            text(
+                """
+                CREATE TABLE pipeline_runs (
+                    id CHAR(32) NOT NULL PRIMARY KEY,
+                    pipeline_id CHAR(32) NOT NULL,
+                    run_id VARCHAR(255) NOT NULL,
+                    status VARCHAR(9) NOT NULL,
+                    started_at DATETIME NOT NULL,
+                    finished_at DATETIME,
+                    duration_ms INTEGER,
+                    error_message TEXT,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+
+    with engine.connect() as connection:
+        gaps = _schema_gaps(inspect(connection), set(inspect(connection).get_table_names()))
+        assert "unique constraint 'uq_pipeline_runs_pipeline_run_id' on pipeline_runs is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+
+
+def test_ignores_missing_non_unique_index(tmp_path, script_directory):
+    """A plain index only affects speed, so it never blocks adoption."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'slow_but_valid.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "ix_alerts_pipeline_id"'))
+
+    with engine.connect() as connection:
+        assert _adopt(connection, script_directory) == 0
+
+
+def test_create_all_schema_carries_the_migration_guards():
+    """The models mirror the revisions, so databases the seeders build are adoptable."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+
+    run_guards = {c["name"] for c in inspector.get_unique_constraints("pipeline_runs")}
+    alert_guards = {i["name"] for i in inspector.get_indexes("alerts") if i["unique"]}
+
+    assert "uq_pipeline_runs_pipeline_run_id" in run_guards
+    assert "uq_active_alert" in alert_guards
 
 
 def test_leaves_managed_and_empty_databases_alone(tmp_path, script_directory):

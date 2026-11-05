@@ -30,21 +30,27 @@ Use PostgreSQL in Docker and in production. SQLite is for a local run only.
    in one transaction.
 3. In the same request, `process_run_event_sync` sets `duration_ms` and
    `last_run_status`.
-4. That task creates a `failure` alert when a task in the run failed.
-5. The dashboard reads the data from the API with `GET /api/v1/*`.
-6. Every 10 minutes, Celery Beat runs `check_stale_pipelines`. That task finds
+4. That step creates a `failure` alert when the run failed.
+5. The same step compares `duration_ms` with the pipeline budget. It creates a
+   `duration_exceeded` alert when the run is longer.
+6. The dashboard reads the data from the API with `GET /api/v1/*`.
+7. Every 10 minutes, Celery Beat runs `check_stale_pipelines`. That task finds
    pipelines with no run in `STALE_PIPELINE_HOURS` hours and creates a `no_run`
    alert for each of them.
 
 ## Alerts
 
-The API creates two alert types:
+The API creates three alert types:
 
-- `failure` - a task in the run failed.
+- `failure` - the run failed.
+- `duration_exceeded` - the run took longer than its budget.
 - `no_run` - the pipeline had no run inside the stale window.
 
-The `AlertType` enum also has `duration_exceeded`. No code creates that alert
-today.
+The budget for a pipeline is `slow_threshold_ms`, when an owner sets it.
+Without that value the API uses the 95th percentile of the last
+`DURATION_BASELINE_SAMPLES` successful runs of the same pipeline. It creates no
+alert until it has `DURATION_BASELINE_MIN_SAMPLES` of those runs. A short run
+history is not an anomaly.
 
 An owner can resolve an alert in the dashboard or with
 `PUT /api/v1/alerts/:id/resolve`.

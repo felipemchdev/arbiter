@@ -4,8 +4,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_org, get_db
 from app.api.role_guard import require_owner
 from app.schemas.page import Page
-from app.schemas.pipeline import DagDefinitionRead, PipelineCreate, PipelineDetail, PipelineRead, PipelineRunSummary
-from app.services.pipeline_service import create_pipeline, delete_pipeline, get_pipeline, get_pipeline_runs, list_pipelines
+from app.schemas.pipeline import (
+    DagDefinitionRead,
+    PipelineCreate,
+    PipelineDetail,
+    PipelineRead,
+    PipelineRunSummary,
+    PipelineUpdate,
+)
+from app.services.pipeline_service import (
+    create_pipeline,
+    delete_pipeline,
+    get_pipeline,
+    get_pipeline_runs,
+    list_pipelines,
+    update_pipeline,
+)
 
 router = APIRouter()
 
@@ -47,6 +61,7 @@ async def read_pipeline(
         "name": pipeline.name,
         "source": pipeline.source,
         "dag_id": pipeline.dag_id,
+        "slow_threshold_ms": pipeline.slow_threshold_ms,
         "last_run_status": pipeline.last_run_status,
         "last_run_at": pipeline.last_run_at,
         "created_at": pipeline.created_at,
@@ -55,6 +70,20 @@ async def read_pipeline(
         else DagDefinitionRead(nodes=dag_definition.nodes, edges=dag_definition.edges, updated_at=dag_definition.updated_at),
     }
     return PipelineDetail.model_validate(payload)
+
+
+@router.patch("/{pipeline_id}", response_model=PipelineRead)
+async def patch_pipeline(
+    pipeline_id: str,
+    payload: PipelineUpdate,
+    current_org=Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    pipeline = await update_pipeline(db, pipeline_id, current_org.id, payload)
+    if pipeline is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
+    await db.commit()
+    return pipeline
 
 
 @router.get("/{pipeline_id}/runs", response_model=Page[PipelineRunSummary])

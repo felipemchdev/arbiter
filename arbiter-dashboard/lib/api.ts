@@ -83,6 +83,28 @@ async function apiFetch<T>(path: string, token?: string, init: RequestInit = {})
   }
 }
 
+/** PATCH a pipeline setting; throws when the API rejects the request. */
+export async function apiPatch<T>(path: string, body: unknown, token: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`PATCH ${path} failed: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+/** Update the duration budget of a pipeline. `null` clears it and falls back to the history baseline. */
+export async function updatePipelineBudget(pipelineId: string, slowThresholdMs: number | null, token: string) {
+  return apiPatch<Pipeline>(`/api/v1/pipelines/${pipelineId}`, { slow_threshold_ms: slowThresholdMs }, token);
+}
+
 export async function getPipeline(id: string, token?: string) {
   return await apiFetch<Pipeline>(`/api/v1/pipelines/${id}`, token);
 }

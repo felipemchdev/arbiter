@@ -32,6 +32,7 @@ export interface Pipeline {
   name: string;
   source: PipelineSource;
   dag_id?: string | null;
+  slow_threshold_ms?: number | null;
   last_run_status?: RunStatus | null;
   last_run_at?: string | null;
   created_at: string;

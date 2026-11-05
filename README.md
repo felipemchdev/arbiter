@@ -63,8 +63,12 @@ local sem Docker usa SQLite.
    uma escrita falha, a API nao salva nada.
 3. No mesmo request, a API define `duration_ms` e `last_run_status`.
 4. A API cria um alerta `failure` quando uma task daquela run falhou.
-5. O dashboard le os dados na API. A run nova aparece assim que a API a salva.
-6. O Celery Beat executa `check_stale_pipelines` a cada 10 minutos. Essa task
+5. A API compara `duration_ms` com o orcamento do pipeline e cria um alerta
+   `duration_exceeded` quando a run passa dele. O orcamento e
+   `slow_threshold_ms`, quando o dono o define. Sem ele, a API usa o p95 das
+   ultimas runs de sucesso do mesmo pipeline.
+6. O dashboard le os dados na API. A run nova aparece assim que a API a salva.
+7. O Celery Beat executa `check_stale_pipelines` a cada 10 minutos. Essa task
    cria um alerta `no_run` para cada pipeline sem run ha 24 horas.
 
 ### Quick Start
@@ -175,6 +179,10 @@ celery -A app.workers.celery_app worker --loglevel=info
 A API precisa de um `DATABASE_URL`. Uma execucao local sem Docker usa SQLite. O
 worker tambem precisa de um Redis ativo, porque o Celery pega as tasks no Redis.
 
+Um banco SQLite criado por um seed antigo ja existe, entao o `create_all` nao
+adiciona a coluna nova `slow_threshold_ms`. Apague esse arquivo e rode o seed de
+novo, ou siga a mensagem de `app.scripts.adopt_baseline`.
+
 ---
 
 ## EN
@@ -239,9 +247,13 @@ SQLite.
    transaction. If one write fails, the API saves nothing.
 3. In the same request, the API sets `duration_ms` and `last_run_status`.
 4. The API creates a `failure` alert when a task in that run failed.
-5. The dashboard reads the data from the API. The new run appears as soon as
+5. The API compares `duration_ms` with the budget of the pipeline and creates a
+   `duration_exceeded` alert when the run is longer. The budget is
+   `slow_threshold_ms` when an owner sets it. Without that value the API uses
+   the p95 of the last successful runs of the same pipeline.
+6. The dashboard reads the data from the API. The new run appears as soon as
    the API saves it.
-6. Celery Beat runs `check_stale_pipelines` every 10 minutes. That task creates
+7. Celery Beat runs `check_stale_pipelines` every 10 minutes. That task creates
    a `no_run` alert for each pipeline with no run in 24 hours.
 
 ### Quick Start
@@ -351,6 +363,10 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 The API needs a `DATABASE_URL`. A local run without Docker uses SQLite. The
 worker also needs a running Redis, because Celery takes its tasks from Redis.
+
+A SQLite file that an older seed created already has the `pipelines` table, so
+`create_all` does not add the new `slow_threshold_ms` column. Delete that file
+and run the seed again, or follow the message from `app.scripts.adopt_baseline`.
 
 ## License
 

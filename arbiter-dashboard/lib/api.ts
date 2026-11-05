@@ -1,4 +1,4 @@
-import type { Alert, ApiKey, ApiKeyCreated, Page, Pipeline, PipelineRun, TaskInstance } from "@/lib/types";
+import type { Alert, ApiKey, ApiKeyCreated, Page, Pipeline, PipelineRun, RunListItem, TaskInstance } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -116,6 +116,26 @@ export async function getPipelineRuns(id: string, token?: string) {
 
 export async function getRun(id: string, token?: string) {
   return await apiFetch<PipelineRun>(`/api/v1/runs/${id}`, token);
+}
+
+/**
+ * One page of the organisation-wide run list.
+ *
+ * Empty and undefined filters are left out of the query, so the API never sees `status=`.
+ * A null result means the request failed: the API is down or a filter value is invalid.
+ */
+export async function getRuns(
+  token?: string,
+  filters: Partial<Record<string, string | number>> = {},
+) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return await apiFetch<Page<RunListItem>>(`/api/v1/runs${suffix}`, token);
 }
 
 export async function getRunTasks(id: string, token?: string) {

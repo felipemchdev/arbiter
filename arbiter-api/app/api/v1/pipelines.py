@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
 from app.api.role_guard import require_owner
+from app.models.pipeline import RunStatus
 from app.schemas.page import Page
 from app.schemas.pipeline import (
     DagDefinitionRead,
@@ -28,10 +29,16 @@ router = APIRouter()
 async def read_pipelines(
     current_org=Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
+    # "status" is the public name; the module already imports fastapi's status helper.
+    run_status: RunStatus | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
-    items, total = await list_pipelines(db, current_org.id, limit=limit, offset=offset)
+    """List the pipelines of the organisation, with optional name and status filters."""
+    items, total = await list_pipelines(
+        db, current_org.id, run_status=run_status, query=q, limit=limit, offset=offset
+    )
     return Page(items=items, total=total, limit=limit, offset=offset)
 
 

@@ -5,15 +5,33 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.alert import Alert
+from app.models.alert import Alert, AlertType
 
 
 class AlertRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_active(self, org_id, limit: int = 50, offset: int = 0) -> tuple[list[Alert], int]:
-        filters = (Alert.resolved.is_(False), Alert.pipeline.has(org_id=org_id))
+    async def list_alerts(
+        self,
+        org_id,
+        *,
+        alert_type: AlertType | None = None,
+        resolved: bool | None = None,
+        pipeline_id: UUID | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[Alert], int]:
+        """Page through the alerts of one organisation.
+
+        An absent ``resolved`` filter keeps the previous behaviour: open alerts only.
+        """
+        filters = [Alert.resolved == (False if resolved is None else resolved)]
+        if alert_type is not None:
+            filters.append(Alert.type == alert_type)
+        if pipeline_id is not None:
+            filters.append(Alert.pipeline_id == pipeline_id)
+        filters.append(Alert.pipeline.has(org_id=org_id))
         total_result = await self.session.execute(
             select(func.count()).select_from(Alert).join(Alert.pipeline).where(*filters)
         )

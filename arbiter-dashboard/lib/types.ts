@@ -51,6 +51,11 @@ export interface PipelineRun {
   created_at: string;
 }
 
+/** One row of the organisation-wide run list: a run plus the pipeline that owns it. */
+export interface RunListItem extends PipelineRun {
+  pipeline_name: string;
+}
+
 export interface TaskInstance {
   id: string;
   run_id: string;

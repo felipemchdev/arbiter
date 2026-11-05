@@ -16,7 +16,7 @@ and alerts.
 | Component | Language | Port | Function |
 |---|---|---|---|
 | arbiter-api | Python/FastAPI | 8000 | Stores runs, checks users, serves data |
-| arbiter-dashboard | TypeScript/Next.js | 3000 | Shows DAGs, timelines, metrics and alerts |
+| arbiter-dashboard | TypeScript/Next.js | 3000 | Shows DAGs, timelines, metrics, the run browser and alerts |
 | arbiter-worker | Python/Celery | - | Runs `check_stale_pipelines` every 10 minutes |
 | arbiter-redis | Redis 7 | 6379 | Holds the Celery queue and the task results |
 | PostgreSQL or SQLite | SQL | 5432 | Stores all Arbiter data |

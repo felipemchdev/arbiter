@@ -47,7 +47,7 @@
 | Servico             | Porta | Funcao                                                                       |
 | ------------------- | ----- | -------------------------------------------------------------------------------- |
 | `arbiter-api`       | 8000  | API REST. Guarda runs, valida usuarios e entrega metricas.                  |
-| `arbiter-dashboard` | 3000  | Interface Next.js. Mostra o DAG (ReactFlow), metricas, timeline e alertas.  |
+| `arbiter-dashboard` | 3000  | Interface Next.js. Mostra o DAG (ReactFlow), metricas, timeline, navegador de runs e alertas.  |
 | `arbiter-worker`    | -     | Worker e Beat do Celery. Executa `check_stale_pipelines` a cada 10 minutos.  |
 | `arbiter-redis`     | 6379  | Redis 7. Guarda a fila do Celery e o resultado das tasks.                   |
 | `postgres`          | 5432  | PostgreSQL 15. Guarda pipelines, runs, tasks e alertas.                      |
@@ -231,7 +231,7 @@ the metrics, the task timeline and the alerts in a dashboard.
 | Service             | Port | Function                                                                              |
 | ------------------- | ---- | --------------------------------------------------------------------------------------- |
 | `arbiter-api`       | 8000 | REST API. It stores runs, checks users and serves metrics.                       |
-| `arbiter-dashboard` | 3000 | Next.js UI. It shows the DAG (ReactFlow), metrics, timelines and alerts.          |
+| `arbiter-dashboard` | 3000 | Next.js UI. It shows the DAG (ReactFlow), metrics, timelines, the run browser and alerts.          |
 | `arbiter-worker`    | -    | Celery worker and Beat. It runs `check_stale_pipelines` every 10 minutes.         |
 | `arbiter-redis`     | 6379 | Redis 7. It holds the Celery queue and the task results.                          |
 | `postgres`          | 5432 | PostgreSQL 15. It stores pipelines, runs, tasks and alerts.                        |

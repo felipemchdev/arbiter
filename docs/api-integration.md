@@ -48,7 +48,7 @@ client needs them.
 | GET | /api/v1/health | Anyone | The API status and its dependencies |
 | GET | /api/v1/metrics | Any valid credential | Run counts for today |
 | GET | /api/v1/metrics/runs-per-day | Any valid credential | The run count for each of the last 7 days |
-| GET | /api/v1/pipelines | Any valid credential | One page of pipelines |
+| GET | /api/v1/pipelines | Any valid credential | One page of pipelines, with optional filters |
 | POST | /api/v1/pipelines | An owner | The new pipeline |
 | GET | /api/v1/pipelines/:id | Any valid credential | One pipeline with its DAG |
 | PATCH | /api/v1/pipelines/:id | An owner | The pipeline with the new budget |
@@ -56,14 +56,50 @@ client needs them.
 | DELETE | /api/v1/pipelines/:id | An owner | Nothing (204) |
 | POST | /api/v1/runs | A key with `collector:write` | The stored run (201) |
 | POST | /api/v1/runs/ingest | A key with `collector:write` | The number of stored runs |
+| GET | /api/v1/runs | Any valid credential | One page of runs from every pipeline, with optional filters |
 | GET | /api/v1/runs/:id | Any valid credential | One run |
 | GET | /api/v1/runs/:id/tasks | Any valid credential | The task instances of that run |
-| GET | /api/v1/alerts | Any valid credential | One page of unresolved alerts |
+| GET | /api/v1/alerts | Any valid credential | One page of open alerts, or resolved alerts on request |
 | PUT | /api/v1/alerts/:id/resolve | An owner | The resolved alert |
 | GET | /api/v1/api-keys | An owner | The keys of the organisation |
 | POST | /api/v1/api-keys | An owner | The new key, shown one time only |
 | POST | /api/v1/api-keys/:id/revoke | An owner | A confirmation message |
 | DELETE | /api/v1/api-keys/:id | An owner | A confirmation message |
+
+## Procedure: Filter a list
+
+Every list endpoint takes `limit` and `offset`. Three endpoints take more filters.
+
+| Endpoint | Extra filters |
+| --- | --- |
+| `GET /api/v1/runs` | `status`, `pipeline_id`, `started_from`, `started_to`, `q` |
+| `GET /api/v1/pipelines` | `status`, `q` |
+| `GET /api/v1/alerts` | `type`, `resolved`, `pipeline_id` |
+
+| Filter | Result |
+| --- | --- |
+| `status` | Runs with that status, or pipelines whose last run had that status |
+| `pipeline_id` | Only the rows of one pipeline |
+| `type` | Only the alerts of one alert type |
+| `resolved` | Open alerts with `false`, resolved alerts with `true`. The default keeps open alerts. |
+| `q` | Rows whose run id or error text contains the search term. The match ignores letter case. |
+| `started_from`, `started_to` | Runs that started inside the window. Both bounds are inclusive. |
+
+1. Put the filters in the query string.
+2. Leave out a filter when you want every value. Do not send `status=` with an
+   empty value. The API answers 422 for that request.
+3. Read `total` in the page envelope. `total` counts the filtered rows, not the
+   whole table.
+4. Percent-encode a date filter. A `+` in `2026-11-01T00:00:00+00:00` must be
+   `%2B`. The `Z` form, `2026-11-01T00:00:00Z`, needs no encoding.
+
+Each row of `GET /api/v1/runs` also carries `pipeline_id` and `pipeline_name`.
+You do not need a second call to label the row.
+
+```sh
+curl "http://localhost:8000/api/v1/runs?status=failed&q=timeout&limit=20" \
+  -H "Authorization: Bearer <access-token>"
+```
 
 ## Rate limits
 

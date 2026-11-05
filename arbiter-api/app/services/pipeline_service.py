@@ -4,23 +4,49 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.dag_definition import DagDefinition
-from app.models.pipeline import Pipeline
+from app.models.pipeline import Pipeline, RunStatus
 from app.schemas.pipeline import PipelineCreate, PipelineUpdate
 
 logger = logging.getLogger(__name__)
 
 
-async def list_pipelines(session: AsyncSession, org_id, limit: int = 50, offset: int = 0) -> tuple[list[Pipeline], int]:
+async def list_pipelines(
+    session: AsyncSession,
+    org_id,
+    *,
+    run_status: RunStatus | None = None,
+    query: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Pipeline], int]:
+    """Page through the pipelines of one organisation, newest created first."""
+    conditions = [Pipeline.org_id == org_id]
+    if run_status is not None:
+        conditions.append(Pipeline.last_run_status == run_status)
+    if query:
+        # lower() + like() instead of ilike keeps this portable across SQLite and PostgreSQL.
+        pattern = f"%{query.lower()}%"
+        conditions.append(
+            or_(
+                func.lower(Pipeline.name).like(pattern),
+                func.lower(Pipeline.dag_id).like(pattern),
+            )
+        )
+
     total_result = await session.execute(
-        select(func.count()).select_from(Pipeline).where(Pipeline.org_id == org_id)
+        select(func.count()).select_from(Pipeline).where(*conditions)
     )
     result = await session.execute(
-        select(Pipeline).where(Pipeline.org_id == org_id).order_by(Pipeline.created_at.desc()).limit(limit).offset(offset)
+        select(Pipeline)
+        .where(*conditions)
+        .order_by(Pipeline.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     return list(result.scalars().all()), total_result.scalar_one()
 

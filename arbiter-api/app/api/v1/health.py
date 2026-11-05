@@ -1,7 +1,8 @@
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import cast, case, Date, func, select, text
+from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import case, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
@@ -14,21 +15,26 @@ router = APIRouter()
 
 @router.get("/health")
 async def health(db: AsyncSession = Depends(get_db)):
-    db_ok = True
-    redis_ok = True
     try:
         await db.execute(text("SELECT 1"))
+        db_ok = True
     except Exception:  # noqa: BLE001
         db_ok = False
     try:
         r = get_redis()
         if r is not None:
             await r.ping()
-        else:
-            redis_ok = False
+        redis_ok = r is not None
     except Exception:  # noqa: BLE001
         redis_ok = False
-    return {"status": "ok", "db": db_ok, "redis": redis_ok}
+
+    dependencies_ok = db_ok and redis_ok
+    # Docker and Container Apps healthchecks only look at the status code, so a
+    # degraded dependency must answer 503 or the container stays "healthy" while down.
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if dependencies_ok else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"status": "ok" if dependencies_ok else "unavailable", "db": db_ok, "redis": redis_ok},
+    )
 
 
 @router.get("/metrics")

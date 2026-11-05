@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.main import app
 from app.models.pipeline import Pipeline, PipelineSource, RunStatus
 from app.models.pipeline_run import PipelineRun
 
@@ -229,3 +230,47 @@ async def test_runs_per_day_default_days_is_seven(client, auth_headers):
     body = response.json()
     assert body["days"] == 7
     assert len(body["data"]) == 7
+
+
+# ---------------------------------------------------------------------------
+# /health
+# ---------------------------------------------------------------------------
+
+class _FakeRedis:
+    def __init__(self, *, fail: bool = False) -> None:
+        self._fail = fail
+
+    async def ping(self):
+        if self._fail:
+            raise ConnectionError("redis is down")
+        return True
+
+
+async def test_health_is_200_when_dependencies_respond(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.health.get_redis", lambda: _FakeRedis())
+    response = await client.get("/api/v1/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "db": True, "redis": True}
+
+
+async def test_health_is_503_when_redis_is_down(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.health.get_redis", lambda: _FakeRedis(fail=True))
+    response = await client.get("/api/v1/health")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] != "ok"
+    assert body["redis"] is False
+
+
+async def test_health_is_503_when_database_is_down(client, monkeypatch):
+    from app.api.deps import get_db
+
+    class _BrokenSession:
+        async def execute(self, *_args, **_kwargs):
+            raise RuntimeError("connection refused")
+
+    monkeypatch.setattr("app.api.v1.health.get_redis", lambda: _FakeRedis())
+    app.dependency_overrides[get_db] = lambda: _BrokenSession()
+    response = await client.get("/api/v1/health")
+    assert response.status_code == 503
+    assert response.json()["db"] is False

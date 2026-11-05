@@ -7,7 +7,7 @@ alembic upgrade head
 if [ "${RUN_SEEDS:-false}" = "true" ]; then
   echo "[bootstrap] Running OSS seeds..."
   python -m app.scripts.seed_dev
-  python -m app.scripts.seed_helios
+  python -m app.scripts.seed_demo
 else
   echo "[bootstrap] Skipping OSS seeds (RUN_SEEDS not set)"
 fi

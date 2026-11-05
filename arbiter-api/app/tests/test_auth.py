@@ -80,3 +80,103 @@ async def test_api_key_crud(client, owner_user):
 
     delete_resp = await client.delete(f"/api/v1/api-keys/{key_id}", headers=headers)
     assert delete_resp.status_code == 200
+
+
+async def _login(client, email: str, password: str) -> str:
+    response = await client.post(
+        "/api/v1/auth/token",
+        data={"username": email, "password": password},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+async def test_viewer_cannot_list_api_keys(client, session, organization):
+    import uuid
+
+    from app.core.security import hash_password
+    from app.models.user import User
+
+    email = f"viewer+{uuid.uuid4().hex[:8]}@test.local"
+    session.add(
+        User(
+            id=uuid.uuid4(),
+            email=email,
+            hashed_password=hash_password("viewerpass123"),
+            role="viewer",
+            org_id=organization.id,
+        )
+    )
+    await session.commit()
+
+    token = await _login(client, email, "viewerpass123")
+    response = await client.get("/api/v1/api-keys", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 403
+
+
+async def test_api_key_rejects_unknown_environment(client, owner_user):
+    token = await _login(client, owner_user.email, owner_user._password)
+    response = await client.post(
+        "/api/v1/api-keys",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "Bad env key", "environment": "quarter"},
+    )
+    assert response.status_code == 422
+
+
+async def test_collector_key_can_ingest_but_is_not_owner(client, session, owner_user, organization):
+    """An API key must be limited to its scopes instead of being treated as owner."""
+    from datetime import UTC, datetime
+
+    from app.models.pipeline import Pipeline, PipelineSource
+
+    token = await _login(client, owner_user.email, owner_user._password)
+    create_resp = await client.post(
+        "/api/v1/api-keys",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"name": "collector key", "environment": "production"},
+    )
+    assert create_resp.status_code == 200
+    raw_key = create_resp.json()["api_key"]
+    key_headers = {"X-API-Key": raw_key}
+
+    pipeline = Pipeline(org_id=organization.id, name="collector-key-pipeline", source=PipelineSource.sdk)
+    session.add(pipeline)
+    await session.commit()
+
+    response = await client.post(
+        "/api/v1/runs",
+        headers=key_headers,
+        json={
+            "pipeline": "collector-key-pipeline",
+            "source": "sdk",
+            "run_id": "run-collector-key",
+            "status": "success",
+            "started_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    assert response.status_code == 201
+
+    response = await client.get("/api/v1/api-keys", headers=key_headers)
+    assert response.status_code == 403
+
+    response = await client.delete(f"/api/v1/pipelines/{pipeline.id}", headers=key_headers)
+    assert response.status_code == 403
+
+
+async def test_access_token_is_revoked_after_password_change(client, owner_user):
+    token = await _login(client, owner_user.email, owner_user._password)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.get("/api/v1/pipelines", headers=headers)
+    assert response.status_code == 200
+
+    change = await client.post(
+        "/api/v1/auth/change-password",
+        headers=headers,
+        json={"current_password": owner_user._password, "new_password": "brandnewpass123"},
+    )
+    assert change.status_code == 200
+
+    response = await client.get("/api/v1/pipelines", headers=headers)
+    assert response.status_code == 401

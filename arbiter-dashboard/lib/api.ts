@@ -1,4 +1,4 @@
-import type { Alert, ApiKey, ApiKeyCreated, Pipeline, PipelineRun, TaskInstance } from "@/lib/types";
+import type { Alert, ApiKey, ApiKeyCreated, Page, Pipeline, PipelineRun, TaskInstance } from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -87,11 +87,8 @@ export async function getPipeline(id: string, token?: string) {
 }
 
 export async function getPipelineRuns(id: string, token?: string) {
-  return (await apiFetch<PipelineRun[]>(`/api/v1/pipelines/${id}/runs`, token)) ?? [];
-}
-
-export async function getPipelineAlerts(id: string, token?: string) {
-  return (await apiFetch<Alert[]>(`/api/v1/pipelines/${id}/alerts`, token)) ?? [];
+  const page = await apiFetch<Page<PipelineRun>>(`/api/v1/pipelines/${id}/runs`, token);
+  return page?.items ?? [];
 }
 
 export async function getRun(id: string, token?: string) {
@@ -103,7 +100,8 @@ export async function getRunTasks(id: string, token?: string) {
 }
 
 export async function getAlerts(token?: string) {
-  return (await apiFetch<Alert[]>("/api/v1/alerts", token)) ?? [];
+  const page = await apiFetch<Page<Alert>>("/api/v1/alerts", token);
+  return page?.items ?? [];
 }
 
 export async function getMetrics(token?: string) {
@@ -117,8 +115,13 @@ export async function resolveAlert(id: string, token?: string) {
   return await apiFetch(`/api/v1/alerts/${id}/resolve`, token, { method: "PUT" });
 }
 
-export async function getPipelines(token?: string) {
-  return (await apiFetch<Pipeline[]>("/api/v1/pipelines", token)) ?? [];
+export async function getPipelines(token?: string, params?: { limit?: number; offset?: number }) {
+  const query = new URLSearchParams();
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const page = await apiFetch<Page<Pipeline>>(`/api/v1/pipelines${suffix}`, token);
+  return page?.items ?? [];
 }
 
 export async function createApiKey(name: string, environment: string, token: string): Promise<ApiKeyCreated> {

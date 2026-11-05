@@ -6,7 +6,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.core.database import async_session_maker, init_models
+from app.core.database import async_session_maker
 from app.core.security import hash_password
 from app.models.organization import Organization
 from app.models.user import User
@@ -52,10 +52,9 @@ async def main() -> None:
                 session.add(user)
                 print(f"[seed:prod] User created: {u['email']} ({u['role']})")
             else:
-                existing.hashed_password = hash_password(u["password"])
-                existing.role = u["role"]
-                session.add(existing)
-                print(f"[seed:prod] User updated: {u['email']} ({u['role']})")
+                # Never re-hash on restart: it wastes CPU and would silently
+                # roll back passwords changed from the dashboard.
+                print(f"[seed:prod] User already exists, skipping: {u['email']}")
 
         await session.commit()
         print("[seed:prod] Done.")

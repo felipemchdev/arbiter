@@ -4,23 +4,25 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.dag_definition import DagDefinition
-from app.models.pipeline import Pipeline, PipelineSource
+from app.models.pipeline import Pipeline
 from app.schemas.pipeline import PipelineCreate
-from app.services.alert_service import process_run_event_sync
 
 logger = logging.getLogger(__name__)
 
 
-async def list_pipelines(session: AsyncSession, org_id, limit: int = 50, offset: int = 0):
+async def list_pipelines(session: AsyncSession, org_id, limit: int = 50, offset: int = 0) -> tuple[list[Pipeline], int]:
+    total_result = await session.execute(
+        select(func.count()).select_from(Pipeline).where(Pipeline.org_id == org_id)
+    )
     result = await session.execute(
         select(Pipeline).where(Pipeline.org_id == org_id).order_by(Pipeline.created_at.desc()).limit(limit).offset(offset)
     )
-    return list(result.scalars().all())
+    return list(result.scalars().all()), total_result.scalar_one()
 
 
 async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate, dag_id: str | None = None) -> Pipeline:
@@ -34,8 +36,9 @@ async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate
         pipeline.source = payload.source
         pipeline.dag_id = dag_id or payload.dag_id or pipeline.dag_id
     session.add(pipeline)
-    await session.commit()
-    await session.refresh(pipeline)
+    # Flush, not commit: ingest_run owns the single transaction covering pipeline,
+    # run, tasks, dag definition and alerts.
+    await session.flush()
     logger.debug("pipeline_staged", extra={"pipeline_id": str(pipeline.id), "org_id": str(org_id)})
     return pipeline
 
@@ -57,9 +60,12 @@ async def get_pipeline_runs(session: AsyncSession, pipeline_id, limit: int, offs
     try:
         pipeline_uuid = UUID(str(pipeline_id))
     except ValueError:
-        return []
+        return [], 0
     from app.models.pipeline_run import PipelineRun
 
+    total_result = await session.execute(
+        select(func.count()).select_from(PipelineRun).where(PipelineRun.pipeline_id == pipeline_uuid)
+    )
     result = await session.execute(
         select(PipelineRun)
         .where(PipelineRun.pipeline_id == pipeline_uuid)
@@ -67,7 +73,7 @@ async def get_pipeline_runs(session: AsyncSession, pipeline_id, limit: int, offs
         .limit(limit)
         .offset(offset)
     )
-    return list(result.scalars().all())
+    return list(result.scalars().all()), total_result.scalar_one()
 
 
 async def upsert_dag_definition(session: AsyncSession, pipeline: Pipeline, nodes: list[dict], edges: list[dict]) -> DagDefinition:

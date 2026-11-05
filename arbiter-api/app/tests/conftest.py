@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -10,16 +9,12 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.deps import get_db
 from app.core.database import Base
 from app.core.security import hash_password
 from app.main import app
-from app.models.alert import Alert
-from app.models.api_key import ApiKey
-from app.models.dag_definition import DagDefinition
 from app.models.organization import Organization
 from app.models.pipeline import Pipeline, PipelineSource, RunStatus
 from app.models.pipeline_run import PipelineRun
@@ -104,7 +99,7 @@ async def auth_headers(client: AsyncClient, owner_user: User) -> dict[str, str]:
 
 
 async def create_pipeline_fixture(session: AsyncSession, organization: Organization) -> Pipeline:
-    pipeline = Pipeline(org_id=organization.id, name="helios-eeip", source=PipelineSource.sdk)
+    pipeline = Pipeline(org_id=organization.id, name="demo-pipeline", source=PipelineSource.sdk)
     session.add(pipeline)
     await session.commit()
     await session.refresh(pipeline)

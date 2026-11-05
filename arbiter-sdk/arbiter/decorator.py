@@ -5,7 +5,7 @@ import functools
 import logging
 import queue
 import threading
-import time
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -14,6 +14,8 @@ import httpx
 logger = logging.getLogger(__name__)
 
 MAX_QUEUE_SIZE = 1000
+SHUTDOWN_POLL_SECONDS = 0.1
+SHUTDOWN_JOIN_SECONDS = 5
 
 
 @dataclass
@@ -69,6 +71,7 @@ class _BackgroundDispatcher:
     def __init__(self, client: _Client) -> None:
         self._client = client
         self._queue: queue.Queue[_RunPayload | None] = queue.Queue(maxsize=MAX_QUEUE_SIZE)
+        self._stopped = threading.Event()
         self._worker = threading.Thread(target=self._drain, daemon=True)
         self._worker.start()
         atexit.register(self.shutdown)
@@ -81,14 +84,25 @@ class _BackgroundDispatcher:
 
     def _drain(self) -> None:
         while True:
-            item = self._queue.get()
+            try:
+                item = self._queue.get(timeout=SHUTDOWN_POLL_SECONDS)
+            except queue.Empty:
+                if self._stopped.is_set():
+                    return
+                continue
             if item is None:
-                break
+                return
             self._client.send_run(item)
 
     def shutdown(self) -> None:
-        self._queue.put(None)
-        self._worker.join(timeout=5)
+        # The queue is bounded, so a blocking put of the sentinel would hang shutdown
+        # when it is full; the stop event lets the worker exit on its own instead.
+        self._stopped.set()
+        try:
+            self._queue.put(None, timeout=SHUTDOWN_POLL_SECONDS)
+        except queue.Full:
+            pass
+        self._worker.join(timeout=SHUTDOWN_JOIN_SECONDS)
 
 
 class Arbiter:
@@ -106,6 +120,9 @@ class Arbiter:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             started = datetime.now(UTC).isoformat()
+            # Second-precision ids collide for concurrent runs of the same pipeline,
+            # and the API upserts on (pipeline, run_id).
+            run_id = f"sdk-{uuid.uuid4().hex}"
             try:
                 result = fn(*args, **kwargs)
             except Exception as exc:
@@ -113,7 +130,7 @@ class Arbiter:
                 self._get_dispatcher().enqueue(
                     _RunPayload(
                         pipeline=self.pipeline,
-                        run_id=f"sdk-{int(time.time())}",
+                        run_id=run_id,
                         status="failed",
                         started_at=started,
                         finished_at=finished,
@@ -129,7 +146,7 @@ class Arbiter:
             self._get_dispatcher().enqueue(
                 _RunPayload(
                     pipeline=self.pipeline,
-                    run_id=f"sdk-{int(time.time())}",
+                    run_id=run_id,
                     status="success",
                     started_at=started,
                     finished_at=finished,

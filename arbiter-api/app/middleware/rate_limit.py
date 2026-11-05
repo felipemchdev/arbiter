@@ -4,12 +4,11 @@ import logging
 import time
 from collections.abc import Callable
 
-import redis.asyncio as aioredis
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from app.core.config import settings
+from app.core.redis import get_redis
 
 logger = logging.getLogger(__name__)
 
@@ -19,29 +18,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self._redis: aioredis.Redis | None = None
-        self._disabled = False
-
-    async def _get_redis(self) -> aioredis.Redis | None:
-        if self._disabled:
-            return None
-        if self._redis is None:
-            try:
-                self._redis = aioredis.from_url(
-                    settings.redis_url, decode_responses=True, socket_connect_timeout=3
-                )
-            except Exception:
-                logger.warning("rate_limit_disabled redis_unavailable")
-                self._disabled = True
-                return None
-        return self._redis
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:
         if request.url.path in ("/api/v1/health", "/api/v1/docs"):
             return await call_next(request)
 
         try:
-            redis = await self._get_redis()
+            # Shared pool from app.core.redis: a second from_url() here would double
+            # the connection count and drift from the rest of the app's Redis config.
+            redis = get_redis()
             if redis is None:
                 return await call_next(request)
 

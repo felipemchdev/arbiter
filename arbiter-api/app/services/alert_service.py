@@ -26,14 +26,19 @@ async def create_alert(
     # Do not use SELECT-then-INSERT: that check is not atomic under concurrent workers.
     # The partial unique index (uq_active_alert) guarantees atomicity at the DB level.
     # If two workers race, the second INSERT raises IntegrityError and we return None.
+    # The savepoint must be open before the alert is added: SQLAlchemy can flush
+    # pending state when a nested transaction starts, and an IntegrityError raised by
+    # that flush would escape the savepoint handling below.
     alert = Alert(pipeline_id=pipeline_id, run_id=run_id, type=alert_type, message=message, resolved=False)
-    session.add(alert)
     try:
-        savepoint = await session.begin_nested()
-        await session.flush()
+        async with session.begin_nested():
+            session.add(alert)
+            await session.flush()
     except IntegrityError:
-        await savepoint.rollback()
-        session.expunge(alert)
+        # The savepoint rollback already detaches the object in SQLAlchemy 2.x;
+        # expunge is kept for the paths where it is still pending.
+        if alert in session:
+            session.expunge(alert)
         logger.debug(
             "alert_already_exists_skipped pipeline_id=%s type=%s",
             pipeline_id, alert_type.value,
@@ -73,7 +78,7 @@ async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> Non
             message=f"Run {run.run_id} failed",
         )
 
-    await session.commit()
+    await session.flush()
     logger.info("run_processed", extra={"run_id": str(run.id), "status": run.status.value})
 
 

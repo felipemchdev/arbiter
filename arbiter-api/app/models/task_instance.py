@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -32,6 +32,6 @@ class TaskInstance(Base):
     log_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     log_output: Mapped[str | None] = mapped_column(Text, nullable=True)
-    input_params: Mapped[str | None] = mapped_column(Text, nullable=True)
+    input_params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     run: Mapped["PipelineRun"] = relationship(back_populates="task_instances")

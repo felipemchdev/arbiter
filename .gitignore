@@ -17,6 +17,9 @@ arbiter_test.db
 *.log
 postgres_data/
 coverage/
+*.tsbuildinfo
+*.egg-info/
+arbiter.db
 .DS_Store
 *.b64.tmp
 

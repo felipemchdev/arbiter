@@ -3,11 +3,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.pipeline import RunStatus
+from app.models.pipeline import PipelineSource, RunStatus
+from app.models.task_instance import TaskStatus
+
 
 class TaskPayload(BaseModel):
     task_id: str
-    status: str
+    status: TaskStatus
     started_at: datetime
     finished_at: datetime | None = None
     duration_ms: int | None = None
@@ -15,11 +17,11 @@ class TaskPayload(BaseModel):
     log_url: str | None = None
     error_message: str | None = None
     log_output: str | None = None
-    input_params: str | None = None
+    input_params: dict | None = None
 
 class RunPayload(BaseModel):
     pipeline: str
-    source: str = "sdk"
+    source: PipelineSource = PipelineSource.sdk
     run_id: str
     status: RunStatus
     started_at: datetime
@@ -56,4 +58,4 @@ class TaskRead(BaseModel):
     log_url: str | None
     error_message: str | None
     log_output: str | None
-    input_params: str | None
+    input_params: dict | None

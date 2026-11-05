@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -9,10 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import Alert, AlertType
 from app.core.config import settings
-from app.models.pipeline import Pipeline
+from app.models.pipeline import Pipeline, RunStatus
 from app.models.pipeline_run import PipelineRun
 
 logger = logging.getLogger(__name__)
+
+# A skipped run still reports a duration, so it belongs in the budget check.
+TERMINAL_RUN_STATUSES = frozenset({RunStatus.success, RunStatus.failed, RunStatus.skipped})
+DURATION_BASELINE_PERCENTILE = 95
 
 
 async def create_alert(
@@ -57,6 +62,56 @@ async def resolve_alert(session: AsyncSession, alert: Alert) -> Alert:
     return alert
 
 
+def _nearest_rank_percentile(values: list[int], percentile: float) -> int:
+    """Return the smallest sample that at least `percentile`% of samples do not exceed."""
+    ordered = sorted(values)
+    rank = max(1, math.ceil(percentile / 100 * len(ordered)))
+    return ordered[rank - 1]
+
+
+async def _duration_budget_ms(session: AsyncSession, *, pipeline: Pipeline, run: PipelineRun) -> int | None:
+    """Budget for this run: the owner's threshold, else the p95 of recent successful runs."""
+    if pipeline.slow_threshold_ms is not None:
+        return pipeline.slow_threshold_ms
+
+    result = await session.execute(
+        select(PipelineRun.duration_ms)
+        .where(
+            PipelineRun.pipeline_id == pipeline.id,
+            PipelineRun.status == RunStatus.success,
+            PipelineRun.duration_ms.is_not(None),
+            PipelineRun.id != run.id,
+        )
+        .order_by(PipelineRun.started_at.desc())
+        .limit(settings.duration_baseline_samples)
+    )
+    durations = [int(value) for value in result.scalars().all() if value is not None]
+    if len(durations) < settings.duration_baseline_min_samples:
+        # Thin history is not an anomaly: alerting here would flag every early run.
+        return None
+    return _nearest_rank_percentile(durations, DURATION_BASELINE_PERCENTILE)
+
+
+async def maybe_create_duration_alert(
+    session: AsyncSession, *, run: PipelineRun, pipeline: Pipeline | None
+) -> Alert | None:
+    """Create a duration_exceeded alert when a terminal run goes over its budget."""
+    if pipeline is None or run.duration_ms is None:
+        return None
+    if run.status not in TERMINAL_RUN_STATUSES:
+        return None
+    budget_ms = await _duration_budget_ms(session, pipeline=pipeline, run=run)
+    if budget_ms is None or run.duration_ms <= budget_ms:
+        return None
+    return await create_alert(
+        session,
+        pipeline_id=run.pipeline_id,
+        run_id=run.id,
+        alert_type=AlertType.duration_exceeded,
+        message=f"Run {run.run_id} took {run.duration_ms}ms, over the {budget_ms}ms budget",
+    )
+
+
 async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> None:
     if run.finished_at and run.started_at and run.duration_ms is None:
         run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
@@ -77,6 +132,8 @@ async def process_run_event_sync(session: AsyncSession, run: PipelineRun) -> Non
             alert_type=AlertType.failure,
             message=f"Run {run.run_id} failed",
         )
+
+    await maybe_create_duration_alert(session, run=run, pipeline=pipeline)
 
     await session.flush()
     logger.info("run_processed", extra={"run_id": str(run.id), "status": run.status.value})

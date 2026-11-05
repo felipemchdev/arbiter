@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.dag_definition import DagDefinition
 from app.models.pipeline import Pipeline
-from app.schemas.pipeline import PipelineCreate
+from app.schemas.pipeline import PipelineCreate, PipelineUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +31,20 @@ async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate
     )
     pipeline = result.scalar_one_or_none()
     if pipeline is None:
-        pipeline = Pipeline(org_id=org_id, name=payload.name, source=payload.source, dag_id=dag_id or payload.dag_id)
+        pipeline = Pipeline(
+            org_id=org_id,
+            name=payload.name,
+            source=payload.source,
+            dag_id=dag_id or payload.dag_id,
+            slow_threshold_ms=payload.slow_threshold_ms,
+        )
     else:
         pipeline.source = payload.source
         pipeline.dag_id = dag_id or payload.dag_id or pipeline.dag_id
+        # Run ingest reuses this function without a threshold; only an explicit
+        # value may change the budget, so a plain ingest never wipes it.
+        if payload.slow_threshold_ms is not None:
+            pipeline.slow_threshold_ms = payload.slow_threshold_ms
     session.add(pipeline)
     # Flush, not commit: ingest_run owns the single transaction covering pipeline,
     # run, tasks, dag definition and alerts.
@@ -54,6 +64,19 @@ async def get_pipeline(session: AsyncSession, pipeline_id, org_id) -> Pipeline |
         .options(selectinload(Pipeline.dag_definition))
     )
     return result.scalar_one_or_none()
+
+
+async def update_pipeline(session: AsyncSession, pipeline_id, org_id, payload: PipelineUpdate) -> Pipeline | None:
+    """Apply only the fields present in the payload; a null threshold clears the budget."""
+    pipeline = await get_pipeline(session, pipeline_id, org_id)
+    if pipeline is None:
+        return None
+    if "slow_threshold_ms" in payload.model_fields_set:
+        pipeline.slow_threshold_ms = payload.slow_threshold_ms
+    session.add(pipeline)
+    # Flush, not commit: the endpoint owns the transaction.
+    await session.flush()
+    return pipeline
 
 
 async def get_pipeline_runs(session: AsyncSession, pipeline_id, limit: int, offset: int):

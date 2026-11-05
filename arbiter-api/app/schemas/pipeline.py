@@ -10,6 +10,13 @@ class PipelineCreate(BaseModel):
     name: str
     source: PipelineSource
     dag_id: str | None = None
+    slow_threshold_ms: int | None = Field(default=None, ge=1)
+
+
+class PipelineUpdate(BaseModel):
+    """Partial update of the pipeline settings an owner controls."""
+
+    slow_threshold_ms: int | None = Field(default=None, ge=1)
 
 
 class DagDefinitionRead(BaseModel):
@@ -27,6 +34,7 @@ class PipelineRead(BaseModel):
     name: str
     source: PipelineSource
     dag_id: str | None
+    slow_threshold_ms: int | None = None
     last_run_status: RunStatus | None
     last_run_at: datetime | None
     created_at: datetime

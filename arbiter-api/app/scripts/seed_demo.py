@@ -90,6 +90,9 @@ async def main() -> None:
                 name=PIPELINE_NAME,
                 source=PipelineSource.airflow,
                 dag_id=DAG_ID,
+                # Above every seeded duration (36700 ms), so the demo shows a budget
+                # without showing a false alert.
+                slow_threshold_ms=45_000,
             )
             session.add(pipeline)
             await session.flush()

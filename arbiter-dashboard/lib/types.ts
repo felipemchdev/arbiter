@@ -3,6 +3,13 @@ export type TaskStatus = RunStatus | "upstream_failed";
 export type PipelineSource = "airflow" | "azure_function" | "sdk";
 export type AlertType = "failure" | "duration_exceeded" | "no_run";
 
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface DagNode {
   id: string;
   label: string;
@@ -55,7 +62,7 @@ export interface TaskInstance {
   log_url?: string | null;
   error_message?: string | null;
   log_output?: string | null;
-  input_params?: string | null;
+  input_params?: Record<string, unknown> | null;
 }
 
 export interface Alert {

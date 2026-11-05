@@ -1,6 +1,10 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 
 def install_exception_handlers(app: FastAPI) -> None:
@@ -14,4 +18,9 @@ def install_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(_: Request, exc: Exception) -> JSONResponse:
-        return JSONResponse(status_code=500, content={"error": "internal_server_error", "detail": str(exc)})
+        # str(exc) can carry connection strings, SQL fragments and file paths — keep it server-side only.
+        logger.exception("unhandled_exception", exc_info=exc)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "internal_server_error", "detail": "An unexpected error occurred."},
+        )

@@ -4,13 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_org, get_db
 from app.api.role_guard import require_owner
 from app.schemas.alert import AlertRead, AlertResolveResponse
+from app.schemas.page import Page
 from app.services.alert_service import resolve_alert
 from app.repositories.alert_repo import AlertRepository
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[AlertRead])
+@router.get("", response_model=Page[AlertRead])
 async def read_alerts(
     current_org=Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
@@ -18,7 +19,8 @@ async def read_alerts(
     offset: int = Query(default=0, ge=0),
 ):
     repository = AlertRepository(db)
-    return await repository.list_active(current_org.id, limit=limit, offset=offset)
+    items, total = await repository.list_active(current_org.id, limit=limit, offset=offset)
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.put("/{alert_id}/resolve", response_model=AlertResolveResponse)

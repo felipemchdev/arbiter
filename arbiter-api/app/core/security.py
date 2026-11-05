@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from argon2 import PasswordHasher, Type
-from argon2.exceptions import VerificationError
+from argon2.exceptions import InvalidHashError, VerificationError
 from jose import jwt
 
 from app.core.config import settings
@@ -26,7 +26,7 @@ def hash_api_key(raw_api_key: str) -> str:
 def verify_api_key(raw_api_key: str, hashed_key: str) -> bool:
     try:
         return _argon2.verify(hashed_key, raw_api_key)
-    except VerificationError:
+    except (VerificationError, InvalidHashError):
         return False
 
 
@@ -56,9 +56,11 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
-def create_access_token(*, sub: str, org_id: str, role: str = "viewer") -> str:
+def create_access_token(
+    *, sub: str, org_id: str, role: str = "viewer", token_version: int = 0
+) -> str:
     expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": sub, "org_id": org_id, "role": role, "exp": expire}
+    payload = {"sub": sub, "org_id": org_id, "role": role, "tv": token_version, "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
 
 

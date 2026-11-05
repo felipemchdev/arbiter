@@ -19,7 +19,6 @@ from app.core.security import (
     verify_refresh_token,
 )
 from app.models.api_key import ApiKey
-from app.models.organization import Organization
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
@@ -35,7 +34,9 @@ async def authenticate_user(session: AsyncSession, email: str, password: str) ->
 
 
 def build_user_access_token(user: User) -> str:
-    return create_access_token(sub=str(user.id), org_id=str(user.org_id), role=user.role)
+    return create_access_token(
+        sub=str(user.id), org_id=str(user.org_id), role=user.role, token_version=user.token_version
+    )
 
 
 async def build_refresh_token(session: AsyncSession, user: User) -> str:

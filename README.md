@@ -1,6 +1,6 @@
 # Arbiter
 
-[![CI](https://github.com/felipemchdev/arbiter/actions/workflows/deploy.yml/badge.svg)](https://github.com/felipemchdev/arbiter/actions/workflows/deploy.yml)
+[![CI](https://github.com/felipemchdev/arbiter/actions/workflows/ci.yml/badge.svg)](https://github.com/felipemchdev/arbiter/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 
@@ -70,7 +70,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000 (login: admin@arbiter / arbiter26@)
+# Dashboard:  http://localhost:3000 (login: run `docker compose logs api | grep "User created"`)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -92,12 +92,17 @@ Prefixos: `arb_live_` (producao) e `arb_test_` (desenvolvimento/teste).
 
 ### Credenciais padrao
 
-| Usuario          | Senha        | Role   |
-| ---------------- | ------------ | ------ |
-| `admin@arbiter`  | `arbiter26@` | owner  |
-| `viewer@arbiter` | `arbiter26@` | viewer |
+Nao existe senha padrao no repositorio. `seed_dev.py` gera uma senha aleatoria
+por usuario e a imprime uma unica vez no boot:
 
-A seed de desenvolvimento gera uma API key e exibe no log: `docker compose logs api | grep "API Key"`
+```sh
+docker compose logs api | grep "User created"
+```
+
+A seed de desenvolvimento tambem gera uma API key e exibe no log: `docker compose logs api | grep "API Key"`
+
+Para fixar as suas, defina `ARBITER_ADMIN_USER`, `ARBITER_ADMIN_PASSWORD`,
+`ARBITER_VIEWER_USER` e `ARBITER_VIEWER_PASSWORD` no `.env`.
 
 ### Enviando uma Run
 
@@ -213,7 +218,7 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 
-# Dashboard:  http://localhost:3000  (login: admin@arbiter / arbiter26@)
+# Dashboard:  http://localhost:3000  (login: run `docker compose logs api | grep "User created"`)
 # API Docs:   http://localhost:8000/docs
 # API Health: http://localhost:8000/api/v1/health
 ```
@@ -235,12 +240,17 @@ Prefixes: `arb_live_` (production) and `arb_test_` (development/testing).
 
 ### Default Credentials
 
-| User             | Password     | Role   |
-| ---------------- | ------------ | ------ |
-| `admin@arbiter`  | `arbiter26@` | owner  |
-| `viewer@arbiter` | `arbiter26@` | viewer |
+There is no default password in the repository. `seed_dev.py` generates a random
+password per user and prints it once at boot:
 
-The dev seed generates an API key and prints it to the log: `docker compose logs api | grep "API Key"`
+```sh
+docker compose logs api | grep "User created"
+```
+
+The dev seed also generates an API key and prints it to the log: `docker compose logs api | grep "API Key"`
+
+To pin your own, set `ARBITER_ADMIN_USER`, `ARBITER_ADMIN_PASSWORD`,
+`ARBITER_VIEWER_USER` and `ARBITER_VIEWER_PASSWORD` in `.env`.
 
 ### Ingesting a Run
 

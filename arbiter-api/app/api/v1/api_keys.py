@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_org, get_db
+from app.api.deps import get_db
 from app.api.role_guard import require_owner
 from app.core.security import decode_access_token
 from app.models.organization import Organization
@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("", response_model=list[ApiKeyRead])
 async def list_keys(
-    current_org: Organization = Depends(get_current_org),
+    current_org: Organization = Depends(require_owner),
     db: AsyncSession = Depends(get_db),
 ):
     return await list_api_keys(db, current_org.id)
@@ -44,6 +44,7 @@ async def create_key(
         name=body.name,
         environment=body.environment,
         created_by=created_by,
+        scopes=body.scopes,
     )
     return ApiKeyCreateResponse(api_key=raw_key, prefix=api_key.prefix, id=api_key.id)
 

@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.models.pipeline import Pipeline, PipelineSource, RunStatus
+from app.models.pipeline import Pipeline
 from app.models.pipeline_run import PipelineRun
-from app.models.task_instance import TaskInstance, TaskStatus
+from app.models.task_instance import TaskInstance
 from app.schemas.pipeline import PipelineCreate
 from app.schemas.run import RunPayload
 from app.services.alert_service import process_run_event_sync
@@ -25,7 +23,7 @@ async def ingest_run(session: AsyncSession, org_id, payload: RunPayload) -> Pipe
     pipeline = await create_pipeline(
         session,
         org_id,
-        PipelineCreate(name=payload.pipeline, source=PipelineSource(payload.source), dag_id=payload.dag_id),
+        PipelineCreate(name=payload.pipeline, source=payload.source, dag_id=payload.dag_id),
         dag_id=payload.dag_id,
     )
 
@@ -66,13 +64,14 @@ async def ingest_run(session: AsyncSession, org_id, payload: RunPayload) -> Pipe
         task = TaskInstance(
             run_id=run.id,
             task_id=task_payload.task_id,
-            status=TaskStatus(task_payload.status),
+            status=task_payload.status,
             started_at=task_payload.started_at,
             finished_at=task_payload.finished_at,
             duration_ms=task_payload.duration_ms,
             try_number=task_payload.try_number,
             log_url=task_payload.log_url,
             error_message=task_payload.error_message,
+            input_params=task_payload.input_params,
         )
         session.add(task)
 

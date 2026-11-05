@@ -175,6 +175,13 @@ celery -A app.workers.celery_app worker --loglevel=info
 A API precisa de um `DATABASE_URL`. Uma execucao local sem Docker usa SQLite. O
 worker tambem precisa de um Redis ativo, porque o Celery pega as tasks no Redis.
 
+### Documentacao
+
+- `docs/architecture.md` - os componentes e o fluxo de dados.
+- `docs/api-integration.md` - como enviar runs e ler alertas pela API.
+- `docs/adr.md` - as decisoes de arquitetura e os motivos delas.
+- `docs/roadmap.md` - o que o Arbiter faz hoje e qual e o proximo trabalho.
+
 ---
 
 ## EN
@@ -351,6 +358,13 @@ celery -A app.workers.celery_app worker --loglevel=info
 
 The API needs a `DATABASE_URL`. A local run without Docker uses SQLite. The
 worker also needs a running Redis, because Celery takes its tasks from Redis.
+
+### Documentation
+
+- `docs/architecture.md` - the components and the data flow.
+- `docs/api-integration.md` - how to send runs and how to read alerts.
+- `docs/adr.md` - the architecture decisions and their reasons.
+- `docs/roadmap.md` - what Arbiter does today and what work comes next.
 
 ## License
 

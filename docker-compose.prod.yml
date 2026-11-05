@@ -4,42 +4,65 @@ services:
     environment:
       POSTGRES_DB: arbiter
       POSTGRES_USER: arbiter
-      POSTGRES_PASSWORD: arbiter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arbiter -d arbiter"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
   api:
     build: ./arbiter-api
     env_file: .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
 
   worker:
     build: ./arbiter-api
     env_file: .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     command: celery -A app.workers.celery_app worker --loglevel=info
+    restart: unless-stopped
 
   beat:
     build: ./arbiter-api
     env_file: .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     command: celery -A app.workers.celery_app beat --loglevel=info
+    restart: unless-stopped
 
   dashboard:
     build: ./arbiter-dashboard
     env_file: .env
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

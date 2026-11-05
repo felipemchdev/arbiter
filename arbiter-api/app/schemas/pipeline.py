@@ -47,3 +47,10 @@ class PipelineRunSummary(BaseModel):
     duration_ms: int | None
     error_message: str | None
     created_at: datetime
+
+
+class PipelineRunDetail(PipelineRunSummary):
+    """One row of the organisation-wide run list, tagged with its pipeline."""
+
+    pipeline_id: UUID
+    pipeline_name: str

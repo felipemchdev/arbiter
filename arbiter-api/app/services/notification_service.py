@@ -14,7 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.net_guard import check_reachable_url
+from app.core.net_guard import pin_target
 from app.models.alert import Alert
 from app.models.alert_delivery import AlertDelivery, AlertDeliveryStatus
 from app.models.notification_channel import NotificationChannel
@@ -64,25 +64,36 @@ async def send_webhook(
     """POST one payload. Return (response status code, error text, delivered).
 
     The target is taken as plain text, not as a channel row, so the caller can
-    close its read transaction before the network call. The URL is re-checked
-    here: a public name can resolve to an internal address after it was stored.
+    close its read transaction before the network call. The request connects to
+    the address the name resolved to here, and keeps the name as the Host
+    header, the TLS SNI and the certificate subject.
     """
     body = canonical_json(payload)
+    try:
+        target = await pin_target(url)
+    except ValueError as exc:
+        return None, str(exc)[:MAX_ERROR_LENGTH], False
+
     headers = {
         "Content-Type": "application/json",
         "User-Agent": USER_AGENT,
         SIGNATURE_HEADER: sign_body(signing_secret, body),
         DELIVERY_HEADER: str(delivery_id),
         ATTEMPT_HEADER: str(attempt),
+        "Host": target.host_header,
     }
-    try:
-        await check_reachable_url(url)
-    except ValueError as exc:
-        return None, str(exc)[:MAX_ERROR_LENGTH], False
 
     try:
-        async with async_client_factory(timeout=settings.notification_timeout_seconds) as client:
-            response = await client.post(url, content=body, headers=headers)
+        async with async_client_factory(
+            timeout=settings.notification_timeout_seconds, trust_env=False
+        ) as client:
+            response = await client.post(
+                target.url,
+                content=body,
+                headers=headers,
+                extensions={"sni_hostname": target.sni_hostname},
+                follow_redirects=False,
+            )
     except httpx.HTTPError as exc:
         return None, f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LENGTH], False
     except Exception as exc:  # noqa: BLE001
@@ -439,7 +450,18 @@ async def delete_channel(session: AsyncSession, channel: NotificationChannel) ->
 
 
 async def test_channel_send(session: AsyncSession, channel: NotificationChannel) -> dict:
-    """Send one sample payload now and report what the endpoint answered."""
+    """Send one sample payload now and report what the endpoint answered.
+
+    The channel values are read first and the read transaction is closed before
+    the network call, so a slow endpoint holds no transaction. The sample writes
+    no delivery row, so the transaction is rolled back rather than committed: a
+    write another caller queued in this session must not be made durable here.
+    """
+    name = channel.name
+    url = channel.url
+    signing_secret = channel.signing_secret
+    await session.rollback()
+
     now = datetime.now(UTC)
     payload = {
         "delivery_id": "test",
@@ -448,7 +470,7 @@ async def test_channel_send(session: AsyncSession, channel: NotificationChannel)
         "alert": {
             "id": "test",
             "type": "failure",
-            "message": "Arbiter test notification for channel " + channel.name,
+            "message": "Arbiter test notification for channel " + name,
             "resolved": False,
             "created_at": now.isoformat(),
         },
@@ -456,7 +478,7 @@ async def test_channel_send(session: AsyncSession, channel: NotificationChannel)
         "run": None,
     }
     status_code, error, delivered = await send_webhook(
-        channel.url, channel.signing_secret, payload, delivery_id="test", attempt=1
+        url, signing_secret, payload, delivery_id="test", attempt=1
     )
     return {
         "delivered": delivered,

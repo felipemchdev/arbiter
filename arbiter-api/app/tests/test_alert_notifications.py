@@ -5,12 +5,14 @@ import hmac
 import json
 import uuid
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlsplit
 
 import httpx
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.core import net_guard
 from app.core.config import settings
 from app.core.database import Base
 from app.core.security import hash_password
@@ -43,12 +45,24 @@ class FakeEndpoint:
     async def __aexit__(self, *exc) -> bool:
         return False
 
-    async def post(self, url, content=None, headers=None) -> httpx.Response:
+    async def post(self, url, content=None, headers=None, extensions=None, follow_redirects=None):
         self.calls.append({"url": url, "content": content, "headers": headers})
         request = httpx.Request("POST", url)
         if self.status_code is None:
             raise httpx.ConnectError("connection refused", request=request)
         return httpx.Response(self.status_code, request=request)
+
+
+@pytest.fixture(autouse=True)
+def _target_needs_no_resolver(monkeypatch):
+    """Pin each test target to its own name, so the suite never asks a real resolver."""
+
+    async def _pin(url: str) -> net_guard.PinnedTarget:
+        net_guard.check_stored_url(url)
+        host = urlsplit(url).hostname
+        return net_guard.PinnedTarget(url=url, host_header=host, sni_hostname=host)
+
+    monkeypatch.setattr(notification_service, "pin_target", _pin)
 
 
 async def create_channel(
@@ -372,6 +386,62 @@ async def test_test_endpoint_probes_without_queuing(
     assert body["error"] is None
     assert len(endpoint.calls) == 1
     assert await queue_of(session, organization) == []
+
+
+async def _sender_sees_no_transaction(session, monkeypatch) -> list[bool]:
+    """Replace the sender with a spy that records the session state when entered."""
+    seen: list[bool] = []
+
+    async def _spy(url, signing_secret, payload, *, delivery_id, attempt):
+        seen.append(session.in_transaction())
+        return 200, None, True
+
+    monkeypatch.setattr(notification_service, "send_webhook", _spy)
+    return seen
+
+
+async def test_a_manual_probe_enters_the_sender_with_no_transaction_open(
+    client, session, organization, auth_headers, monkeypatch
+):
+    """A slow receiver must not hold the read transaction of the test endpoint."""
+    created = await create_channel(client, auth_headers, name="no_tx")
+    channel = await notification_service.get_channel(session, created["id"], organization.id)
+    assert session.in_transaction() is True
+    seen = await _sender_sees_no_transaction(session, monkeypatch)
+
+    await notification_service.test_channel_send(session, channel)
+
+    assert seen == [False]
+
+
+async def test_the_worker_enters_the_sender_with_no_transaction_open(
+    client, session, organization, auth_headers, monkeypatch
+):
+    """The claim is committed before the POST, so the queue is not locked either."""
+    await create_channel(client, auth_headers, name="no_tx_worker")
+    await send_failed_run(client, auth_headers, pipeline="no_tx_worker_etl", run_id="no-tx-1")
+    seen = await _sender_sees_no_transaction(session, monkeypatch)
+
+    await notification_service.deliver_due_alerts(session, org_id=organization.id)
+
+    assert seen == [False]
+
+
+async def test_a_manual_probe_does_not_commit_a_pending_write(
+    client, session, organization, auth_headers, monkeypatch
+):
+    """Rolling the read back is what keeps another caller's write out of the database."""
+    created = await create_channel(client, auth_headers, name="keep_out")
+    channel = await notification_service.get_channel(session, created["id"], organization.id)
+    extra = Organization(name=f"pending_{uuid.uuid4().hex[:8]}")
+    session.add(extra)
+    await session.flush()
+    extra_id = extra.id
+    await _sender_sees_no_transaction(session, monkeypatch)
+
+    await notification_service.test_channel_send(session, channel)
+
+    assert await session.get(Organization, extra_id) is None
 
 
 async def test_disabling_a_channel_stops_new_deliveries(client, session, organization, auth_headers):

@@ -5,7 +5,12 @@ from sqlalchemy import create_engine, inspect, text
 
 import app.models  # noqa: F401
 from app.core.database import Base
-from app.scripts.adopt_baseline import _adopt, _schema_gaps, _script_directory
+from app.scripts.adopt_baseline import (
+    _adopt,
+    _normalized_predicate,
+    _schema_gaps,
+    _script_directory,
+)
 
 
 @pytest.fixture(scope="module")
@@ -158,6 +163,16 @@ def test_accepts_a_guard_written_with_other_spacing(tmp_path):
         "ON alerts (pipeline_id, type, run_id, message) WHERE (resolved = 0)",
     )
     assert gaps == []
+
+
+def test_accepts_a_guard_the_server_reprinted_with_its_own_casts():
+    """PostgreSQL stores a predicate as text and answers in its own spelling."""
+    model = "resolved = false AND type = 'no_run'"
+    live = "((resolved = false) AND (type = 'no_run'::text))"
+
+    assert _normalized_predicate(live) == _normalized_predicate(model)
+    wrong = "((resolved = false) AND (type = 'failure'::text))"
+    assert _normalized_predicate(wrong) != _normalized_predicate(model)
 
 
 def test_create_all_schema_carries_the_migration_guards():

@@ -35,18 +35,22 @@ API_ROOT = Path(__file__).resolve().parents[2]
 # The get_indexes key that reports a partial index predicate, by driver.
 _PREDICATE_KEYS = {"postgresql": "postgresql_where", "sqlite": "sqlite_where"}
 
+# A server re-prints a stored predicate with the casts its parser inferred.
+_INFERRED_CAST = re.compile(r"::[a-z_][a-z0-9_]*(?:\[\])?")
+
 
 def _normalized_predicate(clause) -> str | None:
     """Reduce a WHERE clause to the text both sides of the comparison can agree on.
 
-    A driver may report the predicate with parentheses the model never wrote, and
-    both drivers allow any spacing. Only whitespace and grouping brackets are
-    removed; the operator spellings stay, so an index built for the wrong rows
-    reads as a different predicate rather than as an equivalent one.
+    A driver re-prints a predicate it stored: PostgreSQL adds grouping brackets
+    and the casts its parser inferred. Spacing, brackets, inferred casts and
+    quoted identifiers are removed, so an equivalent guard still matches while an
+    index built for other rows keeps reading as a different predicate.
     """
     if clause is None:
         return None
-    return re.sub(r"[\s()]+", "", str(clause)).lower()
+    without_casts = _INFERRED_CAST.sub("", str(clause))
+    return re.sub(r'[\s()"]+', "", without_casts).lower()
 
 
 def _script_directory() -> ScriptDirectory:

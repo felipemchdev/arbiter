@@ -34,8 +34,8 @@ All notable changes to Arbiter are documented in this file.
   failed on an empty database
 - Baseline adoption now checks the uniqueness guards of revisions 0002 and 0003 — their
   name, columns and partial predicate — before it stamps a schema, so a plain index that
-  only borrows a guard name no longer passes. The predicate text is compared after
-  spacing and grouping brackets are removed
+  only borrows a guard name no longer passes. The predicate is compared as text after
+  spacing, brackets and the casts a server reprints are removed
 - Deleting a pipeline that has alert delivery records removes those records with it, so
   PostgreSQL no longer refuses the delete with a foreign key error
 - The delivery worker closes its read transaction before it posts a webhook, so a slow

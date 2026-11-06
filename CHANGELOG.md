@@ -36,8 +36,17 @@ All notable changes to Arbiter are documented in this file.
   name, columns and partial predicate — before it stamps a schema, so a plain index that
   only borrows a guard name no longer passes. The predicate is compared as text after
   spacing, brackets and the casts a server reprints are removed
+- Baseline adoption also compares column types and foreign keys with the models, checks
+  that no stored row already breaks a key, and refuses a driver it cannot read, so an
+  incompatible schema is no longer stamped as if it were current
 - Deleting a pipeline that has alert delivery records removes those records with it, so
   PostgreSQL no longer refuses the delete with a foreign key error
+- Webhook sends connect to the address the channel host resolved to, keep the host in the
+  `Host` header, the TLS SNI and the certificate check, ignore proxy environment variables
+  and follow no redirect. A host that does not resolve, or resolves to a non-public
+  address, is now refused instead of attempted
+- A manual channel test closes its read transaction before the request, and commits no
+  write that another caller had queued in the same session
 - The delivery worker closes its read transaction before it posts a webhook, so a slow
   receiver no longer holds a database connection and an open transaction
 - Migration 0012 created `alert_deliveries` without the `is_test` column the model

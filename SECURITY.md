@@ -28,12 +28,16 @@ as its `.env`. Before exposing Arbiter:
 - `seed_prod.py` creates users but never overwrites an existing password; change
   credentials in the product rather than by re-running the seed.
 - Register webhook channels only for endpoints you control. The API rejects a
-  channel URL whose host is a local name or a non-public address. It checks the
-  resolved address again before every send. A public name can still resolve to an
-  internal address after that check, because the client resolves it once more for
-  the connection. Run the worker in a network segment that cannot reach internal
-  services. Prefer `https://` URLs: the alert body carries pipeline names, run
-  ids and error text.
+  channel URL whose host is a local name or a non-public address. The worker and
+  the test-send endpoint check the target again before each request. They resolve
+  the name once and put the answer in the request URL. The connection therefore
+  uses the address that was checked, not a later answer. A name that does not
+  resolve, or that answers with a private address, is refused. The request keeps
+  the original name in its Host header, in the TLS SNI and in the certificate
+  check. It ignores proxy environment variables and does not follow redirects.
+  Still run the worker in a segment that cannot reach internal services: an
+  address can be public and still route inside your network. Prefer `https://`
+  URLs: the alert body carries pipeline names, run ids and error text.
 - Arbiter stores each channel signing secret in clear text, because the worker
   must compute the HMAC of every body. The API never returns that secret after
   creation. Rotate it by deleting the channel and creating it again.

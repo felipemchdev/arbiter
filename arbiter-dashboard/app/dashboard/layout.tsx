@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/pipelines',  label: 'Pipelines' },
   { href: '/dashboard/runs',       label: 'Runs'      },
   { href: '/dashboard/alerts',     label: 'Alerts'    },
+  { href: '/dashboard/notifications', label: 'Notifications' },
   { href: '/dashboard/api-keys',   label: 'API Keys'  },
 ]
 

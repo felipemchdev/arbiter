@@ -105,3 +105,35 @@ export interface ApiKeyCreated {
   prefix: string;
   id: string;
 }
+
+export interface AlertDelivery {
+  id: string;
+  alert_id: string;
+  channel_id: string;
+  status: "pending" | "delivered" | "failed";
+  attempts: number;
+  response_status_code: number | null;
+  last_error: string | null;
+  next_attempt_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationChannel {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  created_at: string;
+  last_delivery: AlertDelivery | null;
+}
+
+export interface NotificationChannelCreated extends NotificationChannel {
+  signing_secret: string;
+}
+
+export interface TestSendResult {
+  delivered: boolean;
+  status_code: number | null;
+  error: string | null;
+}

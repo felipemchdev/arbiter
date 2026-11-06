@@ -1,4 +1,17 @@
-import type { Alert, ApiKey, ApiKeyCreated, Page, Pipeline, PipelineRun, RunListItem, TaskInstance } from "@/lib/types";
+import type {
+  Alert,
+  AlertDelivery,
+  ApiKey,
+  ApiKeyCreated,
+  NotificationChannel,
+  NotificationChannelCreated,
+  Page,
+  Pipeline,
+  PipelineRun,
+  RunListItem,
+  TaskInstance,
+  TestSendResult,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -185,4 +198,54 @@ export async function revokeApiKey(id: string, token: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`Revoke ${id} failed: ${response.status}`);
   }
+}
+
+export async function listNotificationChannels(token: string): Promise<NotificationChannel[]> {
+  return apiGet<NotificationChannel[]>("/api/v1/notification-channels", token);
+}
+
+/** Create a channel. The response carries the signing secret, shown only here. */
+export async function createNotificationChannel(
+  payload: { name: string; url: string; enabled: boolean },
+  token: string,
+): Promise<NotificationChannelCreated> {
+  return apiPost<NotificationChannelCreated>("/api/v1/notification-channels", payload, token);
+}
+
+export async function updateNotificationChannel(
+  id: string,
+  payload: { name?: string; url?: string; enabled?: boolean },
+  token: string,
+): Promise<NotificationChannel> {
+  return apiPatch<NotificationChannel>(`/api/v1/notification-channels/${id}`, payload, token);
+}
+
+export async function testNotificationChannel(id: string, token: string): Promise<TestSendResult> {
+  return apiPost<TestSendResult>(`/api/v1/notification-channels/${id}/test`, {}, token);
+}
+
+export async function deleteNotificationChannel(id: string, token: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/v1/notification-channels/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Delete channel ${id} failed: ${response.status}`);
+  }
+}
+
+/** One page of delivery attempts. A null result means the request failed. */
+export async function getDeliveries(
+  token?: string,
+  filters: Partial<Record<string, string | number>> = {},
+) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return await apiFetch<Page<AlertDelivery>>(`/api/v1/notification-channels/deliveries${suffix}`, token);
 }

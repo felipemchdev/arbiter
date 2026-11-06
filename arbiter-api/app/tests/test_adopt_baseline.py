@@ -93,6 +93,51 @@ def test_ignores_missing_non_unique_index(tmp_path, script_directory):
         assert _adopt(connection, script_directory) == 0
 
 
+def _rebuilt_alert_index(tmp_path, db_name, index_ddl: str) -> list[str]:
+    """Return the gaps of a create_all schema whose alert guard is index_ddl."""
+    engine = create_engine(f"sqlite:///{tmp_path / db_name}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+        connection.execute(text(index_ddl))
+    with engine.connect() as connection:
+        return _schema_gaps(inspect(connection), set(inspect(connection).get_table_names()))
+
+
+def test_refuses_a_plain_index_that_only_borrows_the_guard_name(tmp_path, script_directory):
+    """A non-unique index named uq_active_alert still allows duplicate active alerts."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'borrowed_name.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+        connection.execute(
+            text("CREATE INDEX uq_active_alert ON alerts (pipeline_id, type, run_id, message)")
+        )
+
+    with engine.connect() as connection:
+        gaps = _schema_gaps(inspect(connection), set(inspect(connection).get_table_names()))
+        assert "unique index 'uq_active_alert' on alerts is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+
+
+def test_refuses_a_guard_over_the_wrong_columns(tmp_path):
+    """The guard must cover the columns revision 0003 declares, not a subset."""
+    gaps = _rebuilt_alert_index(
+        tmp_path, "wrong_columns.db", "CREATE UNIQUE INDEX uq_active_alert ON alerts (pipeline_id)"
+    )
+    assert "unique index 'uq_active_alert' on alerts covers a different column set" in gaps
+
+
+def test_refuses_a_guard_without_its_partial_predicate(tmp_path):
+    """A full unique index also blocks a new alert after the first one is resolved."""
+    gaps = _rebuilt_alert_index(
+        tmp_path,
+        "not_partial.db",
+        "CREATE UNIQUE INDEX uq_active_alert ON alerts (pipeline_id, type, run_id, message)",
+    )
+    assert "unique index 'uq_active_alert' on alerts is not a partial index" in gaps
+
+
 def test_create_all_schema_carries_the_migration_guards():
     """The models mirror the revisions, so databases the seeders build are adoptable."""
     engine = create_engine("sqlite:///:memory:")

@@ -32,5 +32,6 @@ All notable changes to Arbiter are documented in this file.
 - CORS from hardcoded to `CORS_ORIGINS` env var
 - PostgreSQL: revision 0001 created every enum type twice, so `alembic upgrade head`
   failed on an empty database
-- Baseline adoption now checks the unique guards of revisions 0002 and 0003 before it
-  stamps a schema
+- Baseline adoption now checks the uniqueness guards of revisions 0002 and 0003 — their
+  name, columns and partial predicate — before it stamps a schema, so a plain index that
+  only borrows a guard name no longer passes

@@ -35,6 +35,27 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+REVISION_COLUMN_WIDTH = 255
+
+
+def _widen_version_column(connection) -> None:
+    """Give PostgreSQL room for this project's revision identifiers.
+
+    Alembic builds its version table with ``VARCHAR(32)``, and identifiers such as
+    ``0007_migrate_org_api_key_to_table`` are 33 characters, so the upgrade aborted
+    when it recorded the first identifier that did not fit.
+    """
+    if connection.dialect.name != "postgresql":
+        return
+    connection.exec_driver_sql(
+        "CREATE TABLE IF NOT EXISTS alembic_version ("
+        "version_num VARCHAR(255) NOT NULL CONSTRAINT alembic_version_pkc PRIMARY KEY)"
+    )
+    connection.exec_driver_sql(
+        f"ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR({REVISION_COLUMN_WIDTH})"
+    )
+
+
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
@@ -45,6 +66,7 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
+    _widen_version_column(connection)
 
     with context.begin_transaction():
         context.run_migrations()

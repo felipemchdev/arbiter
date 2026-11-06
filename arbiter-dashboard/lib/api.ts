@@ -1,4 +1,17 @@
-import type { Alert, ApiKey, ApiKeyCreated, Page, Pipeline, PipelineRun, TaskInstance } from "@/lib/types";
+import type {
+  Alert,
+  AlertDelivery,
+  ApiKey,
+  ApiKeyCreated,
+  NotificationChannel,
+  NotificationChannelCreated,
+  Page,
+  Pipeline,
+  PipelineRun,
+  RunListItem,
+  TaskInstance,
+  TestSendResult,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -83,6 +96,28 @@ async function apiFetch<T>(path: string, token?: string, init: RequestInit = {})
   }
 }
 
+/** PATCH a pipeline setting; throws when the API rejects the request. */
+export async function apiPatch<T>(path: string, body: unknown, token: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`PATCH ${path} failed: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+/** Update the duration budget of a pipeline. `null` clears it and falls back to the history baseline. */
+export async function updatePipelineBudget(pipelineId: string, slowThresholdMs: number | null, token: string) {
+  return apiPatch<Pipeline>(`/api/v1/pipelines/${pipelineId}`, { slow_threshold_ms: slowThresholdMs }, token);
+}
+
 export async function getPipeline(id: string, token?: string) {
   return await apiFetch<Pipeline>(`/api/v1/pipelines/${id}`, token);
 }
@@ -94,6 +129,26 @@ export async function getPipelineRuns(id: string, token?: string) {
 
 export async function getRun(id: string, token?: string) {
   return await apiFetch<PipelineRun>(`/api/v1/runs/${id}`, token);
+}
+
+/**
+ * One page of the organisation-wide run list.
+ *
+ * Empty and undefined filters are left out of the query, so the API never sees `status=`.
+ * A null result means the request failed: the API is down or a filter value is invalid.
+ */
+export async function getRuns(
+  token?: string,
+  filters: Partial<Record<string, string | number>> = {},
+) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return await apiFetch<Page<RunListItem>>(`/api/v1/runs${suffix}`, token);
 }
 
 export async function getRunTasks(id: string, token?: string) {
@@ -143,4 +198,54 @@ export async function revokeApiKey(id: string, token: string): Promise<void> {
   if (!response.ok) {
     throw new Error(`Revoke ${id} failed: ${response.status}`);
   }
+}
+
+export async function listNotificationChannels(token: string): Promise<NotificationChannel[]> {
+  return apiGet<NotificationChannel[]>("/api/v1/notification-channels", token);
+}
+
+/** Create a channel. The response carries the signing secret, shown only here. */
+export async function createNotificationChannel(
+  payload: { name: string; url: string; enabled: boolean },
+  token: string,
+): Promise<NotificationChannelCreated> {
+  return apiPost<NotificationChannelCreated>("/api/v1/notification-channels", payload, token);
+}
+
+export async function updateNotificationChannel(
+  id: string,
+  payload: { name?: string; url?: string; enabled?: boolean },
+  token: string,
+): Promise<NotificationChannel> {
+  return apiPatch<NotificationChannel>(`/api/v1/notification-channels/${id}`, payload, token);
+}
+
+export async function testNotificationChannel(id: string, token: string): Promise<TestSendResult> {
+  return apiPost<TestSendResult>(`/api/v1/notification-channels/${id}/test`, {}, token);
+}
+
+export async function deleteNotificationChannel(id: string, token: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/v1/notification-channels/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Delete channel ${id} failed: ${response.status}`);
+  }
+}
+
+/** One page of delivery attempts. A null result means the request failed. */
+export async function getDeliveries(
+  token?: string,
+  filters: Partial<Record<string, string | number>> = {},
+) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return await apiFetch<Page<AlertDelivery>>(`/api/v1/notification-channels/deliveries${suffix}`, token);
 }

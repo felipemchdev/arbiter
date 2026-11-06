@@ -6,6 +6,7 @@ import { DagGraph } from "@/components/dag-graph";
 import { StatusBadge } from "@/components/status-badge";
 import { SourceBadge } from "@/components/source-badge";
 import { AlertList } from "@/components/alert-list";
+import { DurationBudget } from "@/components/duration-budget";
 import Link from "next/link";
 import { Button } from "@/components/ui/button-arbiter";
 import type { Pipeline, PipelineRun, Alert, TaskInstance } from "@/lib/types";
@@ -77,6 +78,10 @@ export default function PipelineDetailClient({
 
       <Tabs active={tab} onTab={setTab} tabs={["Graph", "History", "Alerts"]} />
 
+      <div className="animate-slide-up">
+        <DurationBudget pipelineId={pipeline.id} thresholdMs={pipeline.slow_threshold_ms} token={token} />
+      </div>
+
       {tab === "Graph" && (
         <div className="animate-slide-up" style={{
           background: 'var(--bg-card)',
@@ -141,7 +146,12 @@ export default function PipelineDetailClient({
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   {new Date(run.started_at).toLocaleString()}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                <div style={{
+                  fontSize: 12,
+                  color: run.duration_ms && pipeline.slow_threshold_ms && run.duration_ms > pipeline.slow_threshold_ms
+                    ? "var(--failed)"
+                    : "var(--text-muted)",
+                }}>
                   {run.duration_ms ? `${run.duration_ms} ms` : '—'}
                 </div>
                 <Link href={`/dashboard/runs/${run.id}`}>

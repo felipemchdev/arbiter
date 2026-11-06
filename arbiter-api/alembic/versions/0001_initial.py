@@ -15,16 +15,34 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade() -> None:
-    source_enum = sa.Enum("airflow", "azure_function", "sdk", name="pipelinesource")
-    run_status_enum = sa.Enum("running", "success", "failed", "skipped", name="runstatus")
-    task_status_enum = sa.Enum("running", "success", "failed", "skipped", "upstream_failed", name="taskstatus")
-    alert_type_enum = sa.Enum("failure", "duration_exceeded", "no_run", name="alerttype")
+def _enum(dialect_name: str, name: str, values: tuple[str, ...]):
+    """Build one enum for the target dialect.
 
-    source_enum.create(op.get_bind(), checkfirst=True)
-    run_status_enum.create(op.get_bind(), checkfirst=True)
-    task_status_enum.create(op.get_bind(), checkfirst=True)
-    alert_type_enum.create(op.get_bind(), checkfirst=True)
+    ``op.create_table`` fires the type's ``before_create`` event with
+    ``checkfirst=False``, so a native PostgreSQL enum emits a second
+    ``CREATE TYPE`` next to the explicit ``create()`` calls below.
+    ``create_type=False`` keeps those calls as the only type DDL.
+    """
+    if dialect_name == "postgresql":
+        return postgresql.ENUM(*values, name=name, create_type=False)
+    return sa.Enum(*values, name=name)
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    dialect_name = bind.dialect.name
+
+    source_enum = _enum(dialect_name, "pipelinesource", ("airflow", "azure_function", "sdk"))
+    run_status_enum = _enum(dialect_name, "runstatus", ("running", "success", "failed", "skipped"))
+    task_status_enum = _enum(
+        dialect_name, "taskstatus", ("running", "success", "failed", "skipped", "upstream_failed")
+    )
+    alert_type_enum = _enum(dialect_name, "alerttype", ("failure", "duration_exceeded", "no_run"))
+
+    source_enum.create(bind, checkfirst=True)
+    run_status_enum.create(bind, checkfirst=True)
+    task_status_enum.create(bind, checkfirst=True)
+    alert_type_enum.create(bind, checkfirst=True)
 
     op.create_table(
         "organizations",

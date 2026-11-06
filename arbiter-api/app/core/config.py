@@ -41,12 +41,39 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/1"
     cors_origins: Union[str, List[str]] = "http://localhost:3000"
     stale_pipeline_hours: int = 24
+    duration_baseline_samples: int = 20
+    duration_baseline_min_samples: int = 5
+    notifications_enabled: bool = True
+    notification_timeout_seconds: float = 5.0
+    notification_max_attempts: int = 5
+    notification_backoff_seconds: int = 60
 
     @field_validator("stale_pipeline_hours")
     @classmethod
     def _check_stale_hours(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("stale_pipeline_hours must be a positive integer")
+        return v
+
+    @field_validator("duration_baseline_samples", "duration_baseline_min_samples")
+    @classmethod
+    def _check_positive_baseline(cls, v: int, info) -> int:
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive integer")
+        return v
+
+    @field_validator("notification_timeout_seconds", "notification_backoff_seconds")
+    @classmethod
+    def _check_positive_notification_values(cls, v, info) -> Union[int, float]:
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive number")
+        return v
+
+    @field_validator("notification_max_attempts")
+    @classmethod
+    def _check_notification_attempts(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("notification_max_attempts must be at least 1")
         return v
 
     @field_validator("cors_origins", mode="before")
@@ -91,6 +118,12 @@ class Settings(BaseSettings):
 
     def model_post_init(self, __context) -> None:
         production = self.environment not in DEVELOPMENT_ENVIRONMENTS
+        if self.duration_baseline_samples < self.duration_baseline_min_samples:
+            raise RuntimeError(
+                f"DURATION_BASELINE_SAMPLES={self.duration_baseline_samples} is below "
+                f"DURATION_BASELINE_MIN_SAMPLES={self.duration_baseline_min_samples}. "
+                "No pipeline can reach a history baseline, so duration alerts never fire."
+            )
         key = (self.secret_key or "").strip()
         if _is_placeholder_secret(key):
             if not production:

@@ -17,13 +17,6 @@ const fieldStyle = {
   padding: "0 10px",
 } as const;
 
-/**
- * Filter bar for the run browser.
- *
- * The fields are uncontrolled: applying a filter writes them into the URL, and the page
- * reads them back from the server. `key` on the form remounts the inputs when navigation
- * changes the URL, so the browser back button restores what the reader sees.
- */
 export function RunFilters({
   values,
   pipelines,

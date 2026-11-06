@@ -71,7 +71,7 @@ async def send_webhook(
             response = await client.post(channel.url, content=body, headers=headers)
     except httpx.HTTPError as exc:
         return None, f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LENGTH], False
-    except Exception as exc:  # noqa: BLE001 - a broken receiver must never kill the worker
+    except Exception as exc:  # noqa: BLE001
         logger.exception("webhook_send_crashed channel_id=%s", channel.id)
         return None, f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LENGTH], False
 
@@ -208,7 +208,6 @@ async def _deliver_one(
         )
     )
     if claim.rowcount != 1:
-        # Another worker holds the row: the counter moved before this statement ran.
         await session.rollback()
         return "skipped"
 

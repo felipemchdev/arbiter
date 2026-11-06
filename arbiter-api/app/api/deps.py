@@ -67,8 +67,6 @@ async def _user_from_access_token(db: AsyncSession, token: str) -> tuple[User, d
     if user is None:
         raise _unauthorized("user not found")
 
-    # Access tokens embed the user's token_version; a password change bumps it and
-    # invalidates every token issued before it, matching the refresh-token behaviour.
     try:
         token_version = int(payload.get("tv", 0))
     except (TypeError, ValueError):

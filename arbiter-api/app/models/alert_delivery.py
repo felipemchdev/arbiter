@@ -43,7 +43,6 @@ class AlertDelivery(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    # True when a person started the send from the channel test endpoint.
     is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

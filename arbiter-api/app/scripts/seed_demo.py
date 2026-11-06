@@ -33,7 +33,6 @@ TASKS = [
     {"task_id": "publish_report", "label": "Publish report", "duration_ms": 4300},
 ]
 
-# Newest first: one still running, one failed, one skipped, the rest green.
 DAY_STATUSES = [
     RunStatus.running,
     RunStatus.failed,

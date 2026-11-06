@@ -26,7 +26,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlalchemy.schema import UniqueConstraint
 
-import app.models  # noqa: F401 - registers every table on Base.metadata
+import app.models  # noqa: F401
 from app.core.database import Base, engine
 
 API_ROOT = Path(__file__).resolve().parents[2]

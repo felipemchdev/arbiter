@@ -91,7 +91,7 @@ def rate_limit(max_requests: int = 60, window_seconds: int = 60):
                     )
             except HTTPException:
                 raise
-            except Exception:  # noqa: BLE001 - rate limiting must never take the route down
+            except Exception:  # noqa: BLE001
                 logger.warning("rate_limit_route_check_failed path=%s", request.url.path)
 
             return await func(*args, **kwargs)

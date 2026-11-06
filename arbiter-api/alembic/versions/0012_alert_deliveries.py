@@ -51,7 +51,6 @@ def upgrade():
     )
     op.create_index("ix_alert_deliveries_alert_id", "alert_deliveries", ["alert_id"])
     op.create_index("ix_alert_deliveries_channel_id", "alert_deliveries", ["channel_id"])
-    # The worker selects pending rows whose next_attempt_at has passed.
     op.create_index(
         "ix_alert_deliveries_status_next_attempt",
         "alert_deliveries",

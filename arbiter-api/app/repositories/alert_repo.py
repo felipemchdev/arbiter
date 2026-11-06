@@ -49,7 +49,7 @@ class AlertRepository:
         try:
             alert_uuid = UUID(str(alert_id))
         except ValueError:
-            return None  # malformed UUID -> caller answers 404 instead of a 500
+            return None
         result = await self.session.execute(
             select(Alert).join(Alert.pipeline).where(Alert.id == alert_uuid, Alert.pipeline.has(org_id=org_id))
         )

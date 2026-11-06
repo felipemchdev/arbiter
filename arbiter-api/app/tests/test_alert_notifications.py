@@ -106,7 +106,6 @@ async def test_create_channel_rejects_a_non_http_url(client, auth_headers):
             CHANNELS_URL, headers=auth_headers, json={"name": "bad", "url": bad}
         )
         assert response.status_code == 422, bad
-        # The message from the validator must survive the JSON encoder of the 422 body.
         entry = response.json()["detail"][0]
         assert entry["loc"] == ["body", "url"]
         assert "http" in entry["msg"]
@@ -138,7 +137,6 @@ async def test_viewer_reads_but_never_writes_channels(
     assert (
         await client.delete(f"{CHANNELS_URL}/{created['id']}", headers=viewer_headers)
     ).status_code == 403
-    # A viewer still reads the list, to see why an alert went unanswered.
     assert (await client.get(CHANNELS_URL, headers=viewer_headers)).status_code == 200
 
 
@@ -244,7 +242,6 @@ async def test_server_error_is_retried_and_exhaustion_marks_it_failed(
     row = await session.get(AlertDelivery, row.id)
     assert row.status == AlertDeliveryStatus.failed
     assert row.attempts == 2
-    # A terminal row never becomes due again.
     assert row.next_attempt_at is None
     assert len(endpoint.calls) == 2
 
@@ -274,7 +271,6 @@ async def test_a_delivery_inside_its_lease_is_not_sent_twice(
     await notification_service.deliver_due_alerts(session, org_id=organization.id)
 
     row = (await queue_of(session, organization))[0]
-    # Simulate a worker that claimed the row and did not finish.
     row.status = AlertDeliveryStatus.pending
     row.next_attempt_at = datetime.now(UTC) + timedelta(seconds=120)
     await session.commit()
@@ -313,7 +309,6 @@ async def test_test_endpoint_probes_without_queuing(
     assert body["status_code"] == 204
     assert body["error"] is None
     assert len(endpoint.calls) == 1
-    # A manual probe is not a delivery: it must not enter the queue.
     assert await queue_of(session, organization) == []
 
 

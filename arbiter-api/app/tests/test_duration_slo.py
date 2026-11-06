@@ -70,7 +70,6 @@ async def test_history_baseline_creates_a_duration_alert_without_a_threshold(
     for index, duration in enumerate((100, 200, 300, 400, 500)):
         await ingest_run(client, auth_headers, pipeline="slo-baseline", run_id=f"base-{index}", duration_ms=duration)
 
-    # 480ms stays under the p95 of the five samples, so nothing is reported yet.
     await ingest_run(client, auth_headers, pipeline="slo-baseline", run_id="base-under", duration_ms=480)
     assert await duration_alerts(client, auth_headers) == []
 
@@ -138,7 +137,6 @@ async def test_patch_null_clears_the_threshold(client, session, organization, au
     assert response.status_code == 200
     assert response.json()["slow_threshold_ms"] is None
 
-    # With the budget cleared and two samples only, the slow run must stay silent.
     await ingest_run(client, auth_headers, pipeline="slo-clear", run_id="clear-1", duration_ms=50)
     await ingest_run(client, auth_headers, pipeline="slo-clear", run_id="clear-2", duration_ms=60)
     await ingest_run(client, auth_headers, pipeline="slo-clear", run_id="clear-3", duration_ms=5000)

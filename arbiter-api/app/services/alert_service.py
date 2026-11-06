@@ -41,8 +41,6 @@ async def create_alert(
             session.add(alert)
             await session.flush()
     except IntegrityError:
-        # The savepoint rollback already detaches the object in SQLAlchemy 2.x;
-        # expunge is kept for the paths where it is still pending.
         if alert in session:
             session.expunge(alert)
         logger.debug(
@@ -50,8 +48,6 @@ async def create_alert(
             pipeline_id, alert_type.value,
         )
         return None
-    # The outbox rows share this transaction: a stored alert is always delivered
-    # later, and a rolled back ingest leaves no delivery behind.
     await queue_alert_deliveries(session, alert)
     logger.info("alert_created", extra={"pipeline_id": str(pipeline_id), "type": alert_type.value})
     return alert
@@ -91,7 +87,6 @@ async def _duration_budget_ms(session: AsyncSession, *, pipeline: Pipeline, run:
     )
     durations = [int(value) for value in result.scalars().all() if value is not None]
     if len(durations) < settings.duration_baseline_min_samples:
-        # Thin history is not an anomaly: alerting here would flag every early run.
         return None
     return _nearest_rank_percentile(durations, DURATION_BASELINE_PERCENTILE)
 

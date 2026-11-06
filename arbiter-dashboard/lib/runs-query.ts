@@ -1,14 +1,10 @@
-/** Shared query rules for the run browser, used by the page and its filter bar. */
-
 export const RUN_PAGE_SIZE = 20;
 export const RUN_STATUSES = ["running", "success", "failed", "skipped"];
 
-/** The filter names that appear in a /dashboard/runs URL. */
 export const RUN_FILTER_KEYS = ["status", "pipeline", "q", "from", "to"] as const;
 export type RunFilterKey = (typeof RUN_FILTER_KEYS)[number];
 export type RunFilterValues = Partial<Record<RunFilterKey, string>>;
 
-/** Build a /dashboard/runs link. Empty filters are dropped, and page 1 keeps the URL short. */
 export function runsHref(values: RunFilterValues, page = 1): string {
   const query = new URLSearchParams();
   for (const key of RUN_FILTER_KEYS) {
@@ -24,12 +20,6 @@ export function runsHref(values: RunFilterValues, page = 1): string {
   return suffix ? `/dashboard/runs?${suffix}` : "/dashboard/runs";
 }
 
-/**
- * Turn the two UTC date fields into the API bounds.
- *
- * A whole UTC day is the smallest unit the picker offers, so `from` starts the day
- * and `to` ends it; both API bounds are inclusive.
- */
 export function toRunApiFilters(values: RunFilterValues) {
   return {
     status: RUN_STATUSES.includes(values.status ?? "") ? values.status : undefined,

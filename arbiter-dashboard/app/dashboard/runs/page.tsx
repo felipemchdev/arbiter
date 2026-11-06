@@ -13,7 +13,6 @@ export default async function RunsPage({ searchParams }: { searchParams: Record<
   const session = await getServerSession(authOptions);
   const token = session?.accessToken;
 
-  // Only plain strings reach the filters; a repeated key is ignored rather than guessed at.
   const values: RunFilterValues = {};
   for (const key of RUN_FILTER_KEYS) {
     const value = searchParams[key];

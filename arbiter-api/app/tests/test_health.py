@@ -232,10 +232,6 @@ async def test_runs_per_day_default_days_is_seven(client, auth_headers):
     assert len(body["data"]) == 7
 
 
-# ---------------------------------------------------------------------------
-# /health
-# ---------------------------------------------------------------------------
-
 class _FakeRedis:
     def __init__(self, *, fail: bool = False) -> None:
         self._fail = fail

@@ -75,7 +75,6 @@ export async function apiPut<T>(path: string, body: unknown, token: string): Pro
   return response.json() as Promise<T>;
 }
 
-/** GET a list endpoint, returning null when the API is unreachable or errors. */
 async function apiFetch<T>(path: string, token?: string, init: RequestInit = {}): Promise<T | null> {
   try {
     const response = await fetch(`${API_URL}${path}`, {
@@ -96,7 +95,6 @@ async function apiFetch<T>(path: string, token?: string, init: RequestInit = {})
   }
 }
 
-/** PATCH a pipeline setting; throws when the API rejects the request. */
 export async function apiPatch<T>(path: string, body: unknown, token: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "PATCH",
@@ -113,7 +111,6 @@ export async function apiPatch<T>(path: string, body: unknown, token: string): P
   return response.json() as Promise<T>;
 }
 
-/** Update the duration budget of a pipeline. `null` clears it and falls back to the history baseline. */
 export async function updatePipelineBudget(pipelineId: string, slowThresholdMs: number | null, token: string) {
   return apiPatch<Pipeline>(`/api/v1/pipelines/${pipelineId}`, { slow_threshold_ms: slowThresholdMs }, token);
 }
@@ -131,12 +128,6 @@ export async function getRun(id: string, token?: string) {
   return await apiFetch<PipelineRun>(`/api/v1/runs/${id}`, token);
 }
 
-/**
- * One page of the organisation-wide run list.
- *
- * Empty and undefined filters are left out of the query, so the API never sees `status=`.
- * A null result means the request failed: the API is down or a filter value is invalid.
- */
 export async function getRuns(
   token?: string,
   filters: Partial<Record<string, string | number>> = {},
@@ -171,7 +162,6 @@ export async function resolveAlert(id: string, token?: string) {
   return await apiFetch(`/api/v1/alerts/${id}/resolve`, token, { method: "PUT" });
 }
 
-/** List pipelines; the API page envelope is unwrapped to its items here. */
 export async function getPipelines(token?: string, params?: { limit?: number; offset?: number }) {
   const query = new URLSearchParams();
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
@@ -204,7 +194,6 @@ export async function listNotificationChannels(token: string): Promise<Notificat
   return apiGet<NotificationChannel[]>("/api/v1/notification-channels", token);
 }
 
-/** Create a channel. The response carries the signing secret, shown only here. */
 export async function createNotificationChannel(
   payload: { name: string; url: string; enabled: boolean },
   token: string,
@@ -235,7 +224,6 @@ export async function deleteNotificationChannel(id: string, token: string): Prom
   }
 }
 
-/** One page of delivery attempts. A null result means the request failed. */
 export async function getDeliveries(
   token?: string,
   filters: Partial<Record<string, string | number>> = {},

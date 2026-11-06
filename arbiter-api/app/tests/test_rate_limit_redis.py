@@ -36,7 +36,6 @@ async def test_shared_window_admits_exactly_max_requests_under_concurrency():
         )
         assert sum(decisions) == MAX_REQUESTS
 
-        # A throttled caller must not consume budget: its member is removed again.
         window_size = await client.zcard(key)
         assert window_size == MAX_REQUESTS
     finally:

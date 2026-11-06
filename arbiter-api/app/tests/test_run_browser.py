@@ -7,7 +7,6 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
-# Fixed anchors keep the date filters deterministic.
 T0 = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
 
 
@@ -55,7 +54,6 @@ async def test_run_list_spans_every_pipeline_and_names_each_row(client, auth_hea
     page = await list_runs(client, auth_headers)
 
     assert page["total"] == 2
-    # Newest started run first, so a reader sees the current state without paging.
     assert [item["pipeline_name"] for item in page["items"]] == ["beta_etl", "alpha_etl"]
     assert page["items"][0]["run_id"] == "beta-1"
     assert page["items"][0]["pipeline_id"]
@@ -104,7 +102,6 @@ async def test_run_list_searches_run_id_and_error_message(client, auth_headers):
     by_run_id = await list_runs(client, auth_headers, "?q=nightly")
     assert [item["run_id"] for item in by_run_id["items"]] == ["scheduled__nightly"]
 
-    # The search ignores case, so a reader can type the error as they read it.
     by_error = await list_runs(client, auth_headers, "?q=deadlock")
     assert [item["run_id"] for item in by_error["items"]] == ["scheduled__hourly"]
 
@@ -120,14 +117,12 @@ async def test_run_list_filters_by_started_at_window(client, auth_headers):
         client, auth_headers, pipeline="alpha_etl", run_id="day-3", started_at=T0 + timedelta(days=2)
     )
 
-    # urlencode keeps the "+00:00" offset escaped; a raw plus reads as a space in a query.
     page = await list_runs(
         client,
         auth_headers,
         f"?{urlencode({'started_from': day_2.isoformat(), 'started_to': day_2.isoformat()})}",
     )
 
-    # Both bounds are inclusive, so one day is a one-row window.
     assert [item["run_id"] for item in page["items"]] == ["day-2"]
 
     from_page = await list_runs(client, auth_headers, f"?{urlencode({'started_from': day_2.isoformat()})}")
@@ -207,7 +202,6 @@ async def test_pipeline_list_filters_by_name_dag_id_and_status(client, auth_head
     by_name = await client.get("/api/v1/pipelines?q=nightly", headers=auth_headers)
     assert [item["name"] for item in by_name.json()["items"]] == ["nightly_report"]
 
-    # A dag id is the identifier an operator copies from Airflow, so search it too.
     by_dag_id = await client.get("/api/v1/pipelines?q=DAG_REPORT", headers=auth_headers)
     assert by_dag_id.json()["total"] == 1
 
@@ -244,7 +238,6 @@ async def test_alert_list_filters_by_type_resolved_and_pipeline(client, auth_hea
     resolved = await client.put(f"/api/v1/alerts/{alert['id']}/resolve", headers=auth_headers)
     assert resolved.status_code == 200
 
-    # With no filter the list keeps showing only open alerts.
     after_resolve = await client.get("/api/v1/alerts", headers=auth_headers)
     assert after_resolve.json()["total"] == 0
 

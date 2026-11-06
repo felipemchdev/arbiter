@@ -6,10 +6,6 @@ import { useIsOwner } from "@/lib/useRole";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-/**
- * Budget a run may take, in milliseconds. Without one the API compares each run
- * against the p95 of the pipeline's own history.
- */
 export function DurationBudget({
   pipelineId,
   thresholdMs,

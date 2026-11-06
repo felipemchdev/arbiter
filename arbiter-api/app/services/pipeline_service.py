@@ -72,8 +72,6 @@ async def create_pipeline(session: AsyncSession, org_id, payload: PipelineCreate
         if payload.slow_threshold_ms is not None:
             pipeline.slow_threshold_ms = payload.slow_threshold_ms
     session.add(pipeline)
-    # Flush, not commit: ingest_run owns the single transaction covering pipeline,
-    # run, tasks, dag definition and alerts.
     await session.flush()
     logger.debug("pipeline_staged", extra={"pipeline_id": str(pipeline.id), "org_id": str(org_id)})
     return pipeline
@@ -100,7 +98,6 @@ async def update_pipeline(session: AsyncSession, pipeline_id, org_id, payload: P
     if "slow_threshold_ms" in payload.model_fields_set:
         pipeline.slow_threshold_ms = payload.slow_threshold_ms
     session.add(pipeline)
-    # Flush, not commit: the endpoint owns the transaction.
     await session.flush()
     return pipeline
 

@@ -97,7 +97,6 @@ def test_shutdown_does_not_block_when_queue_is_full():
     client = BlockingClient()
     dispatcher = _BackgroundDispatcher(client)
     try:
-        # One payload parks the worker inside send_run, so the queue really fills.
         dispatcher._queue.put_nowait(_payload())
         assert client.entered.wait(1), "worker never reached the blocking send"
         for _ in range(MAX_QUEUE_SIZE):
@@ -110,8 +109,6 @@ def test_shutdown_does_not_block_when_queue_is_full():
         dispatcher.shutdown()
         elapsed = time.monotonic() - started
 
-        # The sentinel cannot be queued, so shutdown gives up after its join
-        # timeout instead of blocking forever on a full queue.
         assert elapsed < SHUTDOWN_JOIN_SECONDS + 2
         assert dispatcher._worker.is_alive()
     finally:

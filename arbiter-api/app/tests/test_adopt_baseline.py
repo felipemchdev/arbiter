@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import create_engine, inspect, text
 
-import app.models  # noqa: F401 - registers every table on Base.metadata
+import app.models  # noqa: F401
 from app.core.database import Base
 from app.scripts.adopt_baseline import _adopt, _schema_gaps, _script_directory
 

@@ -44,7 +44,7 @@ async def list_pipelines(
     result = await session.execute(
         select(Pipeline)
         .where(*conditions)
-        .order_by(Pipeline.created_at.desc())
+        .order_by(Pipeline.created_at.desc(), Pipeline.id.desc())
         .limit(limit)
         .offset(offset)
     )
@@ -115,7 +115,7 @@ async def get_pipeline_runs(session: AsyncSession, pipeline_id, limit: int, offs
     result = await session.execute(
         select(PipelineRun)
         .where(PipelineRun.pipeline_id == pipeline_uuid)
-        .order_by(PipelineRun.started_at.desc())
+        .order_by(PipelineRun.started_at.desc(), PipelineRun.id.desc())
         .limit(limit)
         .offset(offset)
     )

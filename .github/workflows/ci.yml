@@ -1,13 +1,18 @@
 name: QA CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
       - main
+      - master
       - develop
   pull_request:
     branches:
       - main
+      - master
       - develop
 
 jobs:
@@ -19,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Check whitespace errors
         run: git diff --check
@@ -70,6 +77,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -152,7 +161,12 @@ jobs:
               await conn.execute(INSERT_RUN, FIRST_RUN, PIPELINE)
               try:
                   await conn.execute(INSERT_RUN, SECOND_RUN, PIPELINE)
-              except asyncpg.UniqueViolationError:
+              except asyncpg.UniqueViolationError as exc:
+                  if exc.constraint_name != "uq_pipeline_runs_pipeline_run_id":
+                      raise SystemExit(
+                          f"duplicate run key was rejected by {exc.constraint_name}, "
+                          "expected uq_pipeline_runs_pipeline_run_id"
+                      )
                   print("duplicate (pipeline_id, run_id) rejected")
               else:
                   raise SystemExit("pipeline_runs accepted a duplicate (pipeline_id, run_id)")
@@ -184,6 +198,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -203,6 +219,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -231,6 +249,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4

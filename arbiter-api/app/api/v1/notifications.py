@@ -21,6 +21,7 @@ router = APIRouter()
 
 
 def _read_channel(channel, last_delivery) -> NotificationChannelRead:
+    """One channel with its most recent delivery, as the dashboard reads it."""
     return NotificationChannelRead(
         id=channel.id,
         name=channel.name,
@@ -88,6 +89,7 @@ async def create_channel_endpoint(
 
 
 async def _owned_channel(channel_id: UUID, org_id, db: AsyncSession):
+    """Load a channel of this organisation, or answer 404 for one that is not there."""
     channel = await notification_service.get_channel(db, channel_id, org_id)
     if channel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="channel not found")

@@ -35,3 +35,18 @@ All notable changes to Arbiter are documented in this file.
 - Baseline adoption now checks the uniqueness guards of revisions 0002 and 0003 — their
   name, columns and partial predicate — before it stamps a schema, so a plain index that
   only borrows a guard name no longer passes
+- Migration 0012 created `alert_deliveries` without the `is_test` column the model
+  declares, so a migrated database failed every test send; revision 0013 adds it
+- Revision 0014 keeps one open `no_run` alert per pipeline and removes the duplicates a
+  running system had queued
+- A webhook channel URL that points at a local or private host is rejected at creation
+  and re-checked before each send
+- `slow_threshold_ms` rejects a value above the 32-bit range the column stores
+- List queries break ties on the row id, so one page can no longer repeat or skip a row
+- The delivery claim commits before the HTTP send, so a slow endpoint no longer holds an
+  open transaction
+- `NOTIFICATIONS_ENABLED=false` now stops both the queueing and the sending
+- `seed_prod` exits with an error when the configured admin already exists with another
+  role, instead of starting with no owner login
+- `docker-compose.prod.yml` sets `ENVIRONMENT=production`, which turns the placeholder
+  `SECRET_KEY` guard on

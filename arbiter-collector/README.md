@@ -33,6 +33,10 @@ Each flag also has an environment variable, so you can leave it out. See
 2. It sends that data to `POST /api/v1/runs/ingest`.
 3. It sleeps for `--interval` seconds, then starts again.
 
+The DAG list skips a paused DAG. It reads one page of up to 100 DAGs, which is
+the default page size of the Airflow API. With more than 100 DAGs, the
+collector reports only the first page.
+
 Arbiter updates a run that it already has, so a repeated poll does not make
 duplicate rows.
 

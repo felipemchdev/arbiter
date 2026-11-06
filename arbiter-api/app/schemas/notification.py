@@ -1,21 +1,14 @@
 from datetime import datetime
-from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-def _checked_url(v: str) -> str:
-    """Accept only a plain absolute HTTP or HTTPS endpoint."""
-    parts = urlsplit(v)
-    if parts.scheme not in ("http", "https") or not parts.netloc:
-        raise ValueError("url must be an absolute http or https endpoint")
-    if " " in v:
-        raise ValueError("url must not contain spaces")
-    return v
+from app.core.net_guard import check_stored_url
 
 
 class NotificationChannelCreate(BaseModel):
+    """A new webhook channel; the URL must name a public host."""
+
     name: str = Field(min_length=1, max_length=255)
     url: str = Field(min_length=8, max_length=2048)
     enabled: bool = True
@@ -23,7 +16,8 @@ class NotificationChannelCreate(BaseModel):
     @field_validator("url")
     @classmethod
     def _check_url(cls, v: str) -> str:
-        return _checked_url(v)
+        """Reject anything but a plain absolute HTTP or HTTPS endpoint."""
+        return check_stored_url(v)
 
 
 class NotificationChannelUpdate(BaseModel):
@@ -36,7 +30,8 @@ class NotificationChannelUpdate(BaseModel):
     @field_validator("url")
     @classmethod
     def _check_url(cls, v: str | None) -> str | None:
-        return v if v is None else _checked_url(v)
+        """Apply the channel URL rules to a change, and accept an omitted field."""
+        return v if v is None else check_stored_url(v)
 
 
 class AlertDeliveryRead(BaseModel):

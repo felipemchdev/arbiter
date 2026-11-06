@@ -27,13 +27,15 @@ every minute. That task reads the due rows, posts them and stores the answer.
 
 **Reason:** An ingest request must not wait for a customer endpoint, and it must
 not fail because that endpoint is down. The outbox row makes the promise to send
-part of the alert transaction: an alert that is stored is always delivered
-later, and a rolled back ingest leaves no delivery behind. A slow or dead
-receiver costs a retry, not a lost run event.
+part of the alert transaction: a stored alert keeps its delivery rows, and a
+rolled back ingest leaves no delivery behind. A slow or dead receiver costs a
+retry, not a lost run event.
 
 **Consequences:**
 
-- A notification arrives up to one minute after the alert, not immediately.
+- The first send runs up to one minute after the alert, not immediately. A retried
+  delivery arrives later. After five attempts the row is failed and the receiver
+  gets nothing more for that alert.
 - A worker that dies mid-send leaves the row pending. The next pass sends it
   again, so a receiver can see one alert twice. Receivers should treat
   `X-Arbiter-Delivery` as an idempotency key.

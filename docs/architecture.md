@@ -66,8 +66,10 @@ it. Arbiter therefore posts each new alert to every webhook channel that an
 owner registers.
 
 - The API writes the delivery rows in the alert transaction, so a stored alert
-  always gets a send and a rolled back ingest leaves nothing behind. See
+  keeps its deliveries and a rolled back ingest leaves nothing behind. See
   `docs/adr.md`, ADR-002.
+- A channel URL must point at a public host. The API rejects a local name when it
+  stores the channel and checks the address again before each send.
 - The worker signs each body with HMAC-SHA256, so the receiver can check that
   the request came from Arbiter.
 - A delivery that keeps failing stops after `NOTIFICATION_MAX_ATTEMPTS`

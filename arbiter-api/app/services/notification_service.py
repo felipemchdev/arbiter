@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.net_guard import check_reachable_url
 from app.models.alert import Alert
 from app.models.alert_delivery import AlertDelivery, AlertDeliveryStatus
 from app.models.notification_channel import NotificationChannel
@@ -37,6 +38,7 @@ async_client_factory = httpx.AsyncClient
 
 
 def generate_signing_secret() -> str:
+    """A new receiver secret. The API shows it once, at channel creation."""
     return SECRET_PREFIX + secrets.token_hex(24)
 
 
@@ -46,6 +48,7 @@ def canonical_json(payload: dict) -> bytes:
 
 
 def sign_body(secret: str, body: bytes) -> str:
+    """The ``X-Arbiter-Signature`` value: a SHA-256 HMAC over the exact request body."""
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
@@ -57,7 +60,11 @@ async def send_webhook(
     delivery_id,
     attempt: int,
 ) -> tuple[int | None, str | None, bool]:
-    """POST one payload. Return (response status code, error text, delivered)."""
+    """POST one payload. Return (response status code, error text, delivered).
+
+    The URL is re-checked before the request: a public name can resolve to an
+    internal address after the channel was saved.
+    """
     body = canonical_json(payload)
     headers = {
         "Content-Type": "application/json",
@@ -66,6 +73,11 @@ async def send_webhook(
         DELIVERY_HEADER: str(delivery_id),
         ATTEMPT_HEADER: str(attempt),
     }
+    try:
+        await check_reachable_url(channel.url)
+    except ValueError as exc:
+        return None, str(exc)[:MAX_ERROR_LENGTH], False
+
     try:
         async with async_client_factory(timeout=settings.notification_timeout_seconds) as client:
             response = await client.post(channel.url, content=body, headers=headers)
@@ -81,6 +93,7 @@ async def send_webhook(
 
 
 def _iso(value) -> str | None:
+    """An ISO timestamp for the payload, or null when the run has none."""
     return value.isoformat() if value is not None else None
 
 
@@ -164,8 +177,12 @@ async def deliver_due_alerts(session: AsyncSession, *, org_id=None, limit: int =
     """Send every due delivery once. Return the counts per outcome.
 
     Pass ``org_id`` to work on one organisation's queue; the periodic worker
-    leaves it out and drains every queue.
+    leaves it out and drains every queue. With notifications disabled nothing is
+    sent, so rows already queued wait until the setting is turned back on.
     """
+    counts = {"delivered": 0, "retry": 0, "failed": 0, "skipped": 0}
+    if not settings.notifications_enabled:
+        return counts
     now = datetime.now(UTC)
     statement = (
         select(AlertDelivery.id, AlertDelivery.attempts)
@@ -184,7 +201,6 @@ async def deliver_due_alerts(session: AsyncSession, *, org_id=None, limit: int =
         )
     due = (await session.execute(statement)).all()
 
-    counts = {"delivered": 0, "retry": 0, "failed": 0, "skipped": 0}
     for delivery_id, attempts in due:
         outcome = await _deliver_one(session, delivery_id, attempts, now)
         counts[outcome] += 1
@@ -211,6 +227,7 @@ async def _deliver_one(
         await session.rollback()
         return "skipped"
 
+    await session.commit()
     delivery = await session.get(AlertDelivery, delivery_id)
     if delivery is None:
         await session.rollback()
@@ -318,11 +335,12 @@ async def update_channel(
 
 
 async def last_delivery_for(session: AsyncSession, channel_id) -> AlertDelivery | None:
+    """The most recent attempt for one channel, used by the channels table."""
     return (
         await session.execute(
             select(AlertDelivery)
             .where(AlertDelivery.channel_id == channel_id)
-            .order_by(AlertDelivery.created_at.desc())
+            .order_by(AlertDelivery.created_at.desc(), AlertDelivery.id.desc())
             .limit(1)
         )
     ).scalar_one_or_none()
@@ -358,7 +376,7 @@ async def list_deliveries(
         .where(*conditions)
     )
     result = await session.execute(
-        base.order_by(AlertDelivery.created_at.desc()).limit(limit).offset(offset)
+        base.order_by(AlertDelivery.created_at.desc(), AlertDelivery.id.desc()).limit(limit).offset(offset)
     )
     return list(result.scalars().all()), total_result.scalar_one()
 
@@ -390,6 +408,7 @@ async def create_channel(
 
 
 async def get_channel(session: AsyncSession, channel_id, org_id) -> NotificationChannel | None:
+    """One channel owned by the organisation; a malformed or foreign id yields null."""
     try:
         parsed = UUID(str(channel_id))
     except (ValueError, TypeError):

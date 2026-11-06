@@ -39,7 +39,7 @@ class AlertRepository:
             select(Alert)
             .join(Alert.pipeline)
             .where(*filters)
-            .order_by(Alert.created_at.desc())
+            .order_by(Alert.created_at.desc(), Alert.id.desc())
             .limit(limit)
             .offset(offset)
         )

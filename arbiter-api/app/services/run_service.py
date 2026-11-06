@@ -138,7 +138,7 @@ async def list_runs(
         select(PipelineRun, Pipeline.name)
         .join(Pipeline, Pipeline.id == PipelineRun.pipeline_id)
         .where(*conditions)
-        .order_by(PipelineRun.started_at.desc())
+        .order_by(PipelineRun.started_at.desc(), PipelineRun.id.desc())
         .limit(limit)
         .offset(offset)
     )

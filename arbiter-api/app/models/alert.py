@@ -18,8 +18,9 @@ class AlertType(str, enum.Enum):
 
 class Alert(Base):
     __tablename__ = "alerts"
-    # Mirrors alembic revision 0003 so that databases built by create_all - the test
-    # suite and every seed script - enforce the same alert deduplication as production.
+    # Mirrors alembic revisions 0003 and 0014 so that databases built by create_all -
+    # the test suite and every seed script - enforce the same alert deduplication as
+    # production.
     __table_args__ = (
         Index(
             "uq_active_alert",
@@ -30,6 +31,13 @@ class Alert(Base):
             unique=True,
             postgresql_where=text("resolved = false"),
             sqlite_where=text("resolved = 0"),
+        ),
+        Index(
+            "uq_open_no_run_alert",
+            "pipeline_id",
+            unique=True,
+            postgresql_where=text("resolved = false AND type = 'no_run'"),
+            sqlite_where=text("resolved = 0 AND type = 'no_run'"),
         ),
     )
 

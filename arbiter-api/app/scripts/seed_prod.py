@@ -17,7 +17,8 @@ async def main() -> None:
 
     This is the only production bootstrap path: docker-compose.prod.yml requires
     both variables, so an empty database always gets a login. An existing user is
-    left alone, which keeps a password changed in the product intact.
+    left alone, which keeps a password changed in the product intact. A user whose
+    role differs from the one asked for stops the bootstrap with a non-zero exit.
     """
     admin_user = os.getenv("ARBITER_ADMIN_USER", "").strip()
     admin_pass = os.getenv("ARBITER_ADMIN_PASSWORD", "").strip()
@@ -60,6 +61,12 @@ async def main() -> None:
             else:
                 # Never re-hash on restart: it wastes CPU and would silently
                 # roll back passwords changed from the dashboard.
+                if existing.role != u["role"]:
+                    print(
+                        f"[seed:prod] Error: {u['email']} already exists with role "
+                        f"{existing.role}, this deployment needs role {u['role']}"
+                    )
+                    raise SystemExit(1)
                 print(f"[seed:prod] User already exists, skipping: {u['email']}")
 
         await session.commit()

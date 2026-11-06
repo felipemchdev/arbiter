@@ -29,12 +29,13 @@ async def create_alert(
     message: str,
     run_id=None,
 ) -> Alert | None:
-    # Do not use SELECT-then-INSERT: that check is not atomic under concurrent workers.
-    # The partial unique index (uq_active_alert) guarantees atomicity at the DB level.
-    # If two workers race, the second INSERT raises IntegrityError and we return None.
-    # The savepoint must be open before the alert is added: SQLAlchemy can flush
-    # pending state when a nested transaction starts, and an IntegrityError raised by
-    # that flush would escape the savepoint handling below.
+    """Record one alert. Return None when a partial unique index already covers it.
+
+    Deduplication happens in the database, so no worker needs a check that races.
+    A rejected alert queues no delivery. The savepoint must be open before the alert
+    is added: SQLAlchemy can flush pending state when a nested transaction starts,
+    and an IntegrityError raised by that flush would escape the handling below.
+    """
     alert = Alert(pipeline_id=pipeline_id, run_id=run_id, type=alert_type, message=message, resolved=False)
     try:
         async with session.begin_nested():

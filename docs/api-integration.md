@@ -37,7 +37,7 @@ client needs them.
 | 401 | No credential, a bad token, a revoked key or a disabled method |
 | 403 | The user has the wrong role or the key has no required scope |
 | 422 | A payload field has the wrong type or an unknown value |
-| 429 | The caller passed the rate limit for that route |
+| 429 | The caller passed a rate limit |
 
 ## Endpoints
 
@@ -54,8 +54,8 @@ client needs them.
 | PATCH | /api/v1/pipelines/:id | An owner | The pipeline with the new budget |
 | GET | /api/v1/pipelines/:id/runs | Any valid credential | One page of runs |
 | DELETE | /api/v1/pipelines/:id | An owner | Nothing (204) |
-| POST | /api/v1/runs | A key with `collector:write` | The stored run (201) |
-| POST | /api/v1/runs/ingest | A key with `collector:write` | The number of stored runs |
+| POST | /api/v1/runs | A `collector:write` key or a signed-in user | The stored run (201) |
+| POST | /api/v1/runs/ingest | A `collector:write` key or a signed-in user | The number of stored runs |
 | GET | /api/v1/runs | Any valid credential | One page of runs from every pipeline, with optional filters |
 | GET | /api/v1/runs/:id | Any valid credential | One run |
 | GET | /api/v1/runs/:id/tasks | Any valid credential | The task instances of that run |
@@ -74,7 +74,14 @@ client needs them.
 
 ## Procedure: Filter a list
 
-Every list endpoint takes `limit` and `offset`. Four endpoints take more filters.
+Five endpoints return a page: `GET /api/v1/pipelines`,
+`GET /api/v1/pipelines/:id/runs`, `GET /api/v1/runs`, `GET /api/v1/alerts` and
+`GET /api/v1/notification-channels/deliveries`. Each one takes `limit` and
+`offset`. The other list endpoints return one array with every row:
+`GET /api/v1/api-keys`, `GET /api/v1/notification-channels` and
+`GET /api/v1/runs/:id/tasks`.
+
+Four endpoints take more filters.
 
 | Endpoint | Extra filters |
 | --- | --- |
@@ -90,7 +97,8 @@ Every list endpoint takes `limit` and `offset`. Four endpoints take more filters
 | `channel_id` | Only the deliveries of one channel |
 | `type` | Only the alerts of one alert type |
 | `resolved` | Open alerts with `false`, resolved alerts with `true`. The default keeps open alerts. |
-| `q` | Rows whose run id or error text contains the search term. The match ignores letter case. |
+| `q` on runs | Runs whose run id or error text contains the search term. The match ignores letter case. |
+| `q` on pipelines | Pipelines whose name or dag id contains the search term. The match ignores letter case. |
 | `started_from`, `started_to` | Runs that started inside the window. Both bounds are inclusive. |
 
 1. Put the filters in the query string.
@@ -111,10 +119,17 @@ curl "http://localhost:8000/api/v1/runs?status=failed&q=timeout&limit=20" \
 
 ## Rate limits
 
-The API limits writes per client address and per route:
+Two limits apply to a write:
 
-- `POST /api/v1/runs` - 120 requests in one minute.
-- `POST /api/v1/runs/ingest` - 30 requests in one minute.
+- One shared budget per client address: 100 requests in one minute across all
+  routes. `/api/v1/health` and `/api/v1/docs` do not count against it.
+- A per-route budget on top of that budget:
+  - `POST /api/v1/runs` - 120 requests in one minute.
+  - `POST /api/v1/runs/ingest` - 30 requests in one minute.
+
+The smaller budget stops the request. For `POST /api/v1/runs` that is the shared
+100, not the 120. Every worker process and replica shares the counters, because
+they live in Redis. Without Redis the API does not limit requests.
 
 If you get 429, wait, then send the data again. Use the batch route when you
 have many runs. One batch request counts as one request.
@@ -131,7 +146,7 @@ have many runs. One batch request counts as one request.
 curl -X POST http://localhost:8000/api/v1/runs/ingest \
   -H "X-API-Key: arb_test_xxx" \
   -H "Content-Type: application/json" \
-  -d '{"dags":[{"dag_id":"demo","name":"demo_pipeline","runs":[{...}]}]}'
+  -d '{"dags":[{"dag_id":"demo","name":"demo_pipeline","runs":[{"run_id":"run-1","status":"success","started_at":"2026-11-01T08:00:00Z"}]}]}'
 ```
 
 Every run needs `started_at`. The API computes `duration_ms` when the run also
@@ -184,8 +199,11 @@ curl -X POST http://localhost:8000/api/v1/notification-channels \
   -d '{"name": "on-call", "url": "https://example.com/arbiter/hooks", "enabled": true}'
 ```
 
-The URL must start with `http://` or `https://`. The API answers 422 for any
-other scheme.
+The URL must start with `http://` or `https://` and its host must be public.
+The API rejects `localhost`, names that end in `.local`, `.internal`,
+`.localdomain` or `.home.arpa`, and literal private addresses. It answers 422
+for such a URL. The worker checks the resolved address again before each send.
+A name that later points at a private address fails like any other send error.
 
 ## Alert notification payload
 

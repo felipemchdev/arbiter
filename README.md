@@ -62,7 +62,7 @@ local sem Docker usa SQLite.
 2. A API salva o pipeline, a run, as tasks e o DAG em uma unica transacao. Se
    uma escrita falha, a API nao salva nada.
 3. No mesmo request, a API define `duration_ms` e `last_run_status`.
-4. A API cria um alerta `failure` quando uma task daquela run falhou.
+4. A API cria um alerta `failure` quando o status daquela run e `failed`.
 5. A API compara `duration_ms` com o orcamento do pipeline e cria um alerta
    `duration_exceeded` quando a run passa dele. O orcamento e
    `slow_threshold_ms`, quando o dono o define. Sem ele, a API usa o p95 das
@@ -79,6 +79,10 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 ```
+
+Abra o `.env` antes de subir e troque cada valor `CHANGE_ME`. Use a mesma senha
+em `POSTGRES_PASSWORD` e dentro de `DATABASE_URL`. Os containers nao sobem sem
+`POSTGRES_PASSWORD`.
 
 - Dashboard: http://localhost:3000
 - Documentacao da API: http://localhost:8000/docs
@@ -180,8 +184,10 @@ A API precisa de um `DATABASE_URL`. Uma execucao local sem Docker usa SQLite. O
 worker tambem precisa de um Redis ativo, porque o Celery pega as tasks no Redis.
 
 Um banco SQLite criado por um seed antigo ja existe, entao o `create_all` nao
-adiciona a coluna nova `slow_threshold_ms`. Apague esse arquivo e rode o seed de
-novo, ou siga a mensagem de `app.scripts.adopt_baseline`.
+adiciona a coluna nova `slow_threshold_ms`. Faca um backup do arquivo antes de
+troca-lo. Ele guarda suas pipelines, runs, alertas e usuarios. Copie o arquivo,
+apague o original e rode o seed de novo, ou siga a mensagem de
+`app.scripts.adopt_baseline`.
 
 ### Documentacao
 
@@ -253,7 +259,7 @@ SQLite.
 2. The API saves the pipeline, the run, the tasks and the DAG in one
    transaction. If one write fails, the API saves nothing.
 3. In the same request, the API sets `duration_ms` and `last_run_status`.
-4. The API creates a `failure` alert when a task in that run failed.
+4. The API creates a `failure` alert when the status of that run is `failed`.
 5. The API compares `duration_ms` with the budget of the pipeline and creates a
    `duration_exceeded` alert when the run is longer. The budget is
    `slow_threshold_ms` when an owner sets it. Without that value the API uses
@@ -271,6 +277,10 @@ cd arbiter
 cp .env.example .env
 docker compose up -d
 ```
+
+Open `.env` before you start the containers and replace every `CHANGE_ME`
+value. Use one password in `POSTGRES_PASSWORD` and in `DATABASE_URL`. The
+containers do not start without `POSTGRES_PASSWORD`.
 
 - Dashboard: http://localhost:3000
 - API docs: http://localhost:8000/docs
@@ -372,8 +382,10 @@ The API needs a `DATABASE_URL`. A local run without Docker uses SQLite. The
 worker also needs a running Redis, because Celery takes its tasks from Redis.
 
 A SQLite file that an older seed created already has the `pipelines` table, so
-`create_all` does not add the new `slow_threshold_ms` column. Delete that file
-and run the seed again, or follow the message from `app.scripts.adopt_baseline`.
+`create_all` does not add the new `slow_threshold_ms` column. Back the file up
+before you replace it. It holds your pipelines, runs, alerts and users. Copy
+the file, delete the original, then run the seed again, or follow the message
+from `app.scripts.adopt_baseline`.
 
 ### Documentation
 

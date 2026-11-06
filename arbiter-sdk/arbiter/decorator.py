@@ -64,8 +64,8 @@ class _BackgroundDispatcher:
     Uses a queue + daemon thread instead of threading.Thread(target=...)
     created per-invocation, because Azure Functions can kill the host
     process between the time the decorator fires and the thread completes.
-    A single long-lived daemon thread draining a queue guarantees
-    at-least-once delivery and survives Python's atexit shutdown.
+    Delivery is at most once: a send that fails or is rejected drops the
+    payload, and a process killed before atexit runs can lose the queue.
     """
 
     def __init__(self, client: _Client) -> None:

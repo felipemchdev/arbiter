@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   createNotificationChannel,
@@ -30,7 +30,9 @@ function StatusBadge({ status }: { status: string }) {
       ? { fg: 'var(--success)', bg: 'var(--success-bg)' }
       : status === "failed"
         ? { fg: 'var(--failed)', bg: 'var(--failed-bg)' }
-        : { fg: 'var(--running)', bg: 'var(--running-bg)' };
+        : status === "muted"
+          ? { fg: 'var(--skipped)', bg: 'var(--skipped-bg)' }
+          : { fg: 'var(--running)', bg: 'var(--running-bg)' };
   return (
     <span style={{
       fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
@@ -61,22 +63,27 @@ export default function NotificationsPage() {
   const [secret, setSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [probe, setProbe] = useState<TestSendResult | null>(null);
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
     if (!token) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
+    setError(null);
     try {
       const [rows, page] = await Promise.all([
         listNotificationChannels(token),
         getDeliveries(token, status ? { status, limit: 20 } : { limit: 20 }),
       ]);
+      if (seq !== loadSeq.current) return;
       setChannels(rows);
       setDeliveries(page?.items ?? null);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       console.error("Failed to load notification channels", e);
       setError(e instanceof Error ? e.message : "Failed to load notification channels");
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [token, status]);
 
@@ -120,6 +127,7 @@ export default function NotificationsPage() {
 
   const handleDelete = async (channel: NotificationChannel) => {
     if (!token) return;
+    if (!window.confirm(`Remove "${channel.name}"? Alert deliveries stop immediately.`)) return;
     setError(null);
     try {
       await deleteNotificationChannel(channel.id, token);
@@ -220,6 +228,15 @@ export default function NotificationsPage() {
         </div>
       )}
 
+      {error && (
+        <div role="alert" style={{
+          padding: '8px 12px', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
+          color: 'var(--failed)', background: 'var(--failed-bg)', marginBottom: 24,
+        }}>
+          {error}
+        </div>
+      )}
+
       {isOwner && (
         <div style={{
           padding: 24, borderRadius: 'var(--r-lg)',
@@ -232,10 +249,10 @@ export default function NotificationsPage() {
 
           {creating ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              <label style={{ display: 'block' }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                   Name
-                </label>
+                </span>
                 <input
                   value={name}
                   onChange={e => setName(e.target.value)}
@@ -247,11 +264,11 @@ export default function NotificationsPage() {
                     fontFamily: "'DM Sans', sans-serif", outline: 'none',
                   }}
                 />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
+              </label>
+              <label style={{ display: 'block' }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                   Endpoint URL
-                </label>
+                </span>
                 <input
                   value={url}
                   onChange={e => setUrl(e.target.value)}
@@ -264,19 +281,11 @@ export default function NotificationsPage() {
                   }}
                   onKeyDown={e => e.key === "Enter" && handleCreate()}
                 />
-              </div>
+              </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
                 <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} />
                 Start sending immediately
               </label>
-              {error && (
-                <div style={{
-                  padding: '8px 12px', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
-                  color: 'var(--failed)', background: 'var(--failed-bg)',
-                }}>
-                  {error}
-                </div>
-              )}
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={handleCreate}

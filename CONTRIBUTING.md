@@ -3,7 +3,10 @@
 ## Development Setup
 
 1. Clone the repository and enter the folder.
-2. Copy `.env.example` to `.env`.
+2. Copy `.env.example` to `.env`. Replace every `CHANGE_ME` value. Put the same
+   password in `POSTGRES_PASSWORD` and in the `DATABASE_URL` of the `arbiter`
+   user. The containers do not start when one of the two values is missing, and
+   the API cannot reach PostgreSQL when they do not match.
 3. Start the containers.
 
 ```sh

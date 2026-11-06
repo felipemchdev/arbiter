@@ -7,7 +7,9 @@ and the container restart policy repeats that failure forever.
 
 The head revision is stamped only when the live schema already holds every model
 table, every model column and the uniqueness objects the application relies on.
-A partial schema is refused instead: stamping it would tell Alembic the database is
+A guard is matched by name, by its columns and by its partial predicate, so a
+plain index that only borrows the name of a guard does not pass. A partial schema
+is refused instead: stamping it would tell Alembic the database is
 current while a protection that later revisions add - the unique run key or the
 active-alert index - is still missing.
 """
@@ -29,6 +31,9 @@ from app.core.database import Base, engine
 
 API_ROOT = Path(__file__).resolve().parents[2]
 
+# The get_indexes key that reports a partial index predicate, by driver.
+_PREDICATE_KEYS = {"postgresql": "postgresql_where", "sqlite": "sqlite_where"}
+
 
 def _script_directory() -> ScriptDirectory:
     """Load the migration scripts by absolute path, so the cwd does not matter."""
@@ -39,39 +44,77 @@ def _script_directory() -> ScriptDirectory:
     return ScriptDirectory.from_config(config)
 
 
-def _uniqueness_guards(table) -> dict[str, str]:
-    """Return the named uniqueness objects a table must carry, by kind.
+def _uniqueness_guards(table, dialect: str) -> dict[str, dict]:
+    """Return the named uniqueness objects a table must carry, in comparable form.
 
     Only objects that stop duplicate rows are required. Plain ``ix_*`` indexes are
     performance-only, and a missing one is repaired by ``CREATE INDEX``, not by a
     human decision. Column types stay unchecked: the driver returns dialect objects
     that do not compare reliably between SQLite and PostgreSQL.
     """
-    guards: dict[str, str] = {}
+    reports_predicate = dialect in _PREDICATE_KEYS
+    guards: dict[str, dict] = {}
     for constraint in table.constraints:
         if isinstance(constraint, UniqueConstraint) and constraint.name:
-            guards[constraint.name] = "unique constraint"
+            guards[constraint.name] = {
+                "kind": "unique constraint",
+                "columns": frozenset(column.name for column in constraint.columns),
+                "partial": False,
+            }
     for index in table.indexes:
-        if index.unique and index.name:
-            guards[index.name] = "unique index"
+        if not index.unique or not index.name:
+            continue
+        options = index.dialect_options.get(dialect) or {}
+        guards[index.name] = {
+            "kind": "unique index",
+            "columns": frozenset(column.name for column in index.columns),
+            # None means "not compared", never "must be absent". A predicate is a
+            # clause object, so it is tested with `is not None`, never with truthness.
+            "partial": (options.get("where") is not None) if reports_predicate else None,
+        }
     return guards
 
 
-def _live_uniqueness(inspector, table_name: str) -> set[str]:
-    """Names of uniqueness objects the live schema reports for one table.
+def _live_guards(inspector, table_name: str) -> dict[str, dict]:
+    """Return the uniqueness objects the live schema reports for one table, by name.
 
-    A driver may surface the same guard as either a constraint or an index, so both
-    are collected. Their presence also rules out the duplicate rows that the missing
-    guard would have rejected, which is why no data scan is needed.
+    A non-unique index is never a guard: a plain index can carry the name of a
+    unique object and still allow the duplicate rows the application forbids. A
+    driver may surface the same guard as a constraint or as an index, so both are
+    collected. Their columns are compared as a set, and a partial predicate only
+    where the driver reports one, because SQLite and PostgreSQL spell the same
+    predicate with different text.
     """
-    names = {item["name"] for item in inspector.get_unique_constraints(table_name)}
-    names |= {item["name"] for item in inspector.get_indexes(table_name)}
-    return {name for name in names if name}
+    predicate_key = _PREDICATE_KEYS.get(inspector.dialect.name)
+    guards: dict[str, dict] = {}
+    for item in inspector.get_unique_constraints(table_name):
+        if item.get("name"):
+            guards[item["name"]] = {
+                "kind": "unique constraint",
+                "columns": frozenset(item.get("column_names") or ()),
+                "partial": False,
+            }
+    for item in inspector.get_indexes(table_name):
+        if not item.get("name") or not item.get("unique"):
+            continue
+        guards.setdefault(
+            item["name"],
+            {
+                "kind": "unique index",
+                # An expression index reports no column names, so it never matches.
+                "columns": frozenset(item.get("column_names") or ()),
+                "partial": (item.get("dialect_options", {}).get(predicate_key) is not None)
+                if predicate_key
+                else None,
+            },
+        )
+    return guards
 
 
 def _schema_gaps(inspector, tables: set[str]) -> list[str]:
     """Describe why the live schema is not model-complete."""
     gaps: list[str] = []
+    dialect = inspector.dialect.name
     for name, table in Base.metadata.tables.items():
         if name not in tables:
             gaps.append(f"table {name!r} is missing")
@@ -82,10 +125,15 @@ def _schema_gaps(inspector, tables: set[str]) -> list[str]:
                 gaps.append(f"column {name}.{column.name} is missing")
             elif bool(live[column.name]["nullable"]) != bool(column.nullable):
                 gaps.append(f"column {name}.{column.name} nullability differs")
-        present = _live_uniqueness(inspector, name)
-        for guard, kind in _uniqueness_guards(table).items():
-            if guard not in present:
-                gaps.append(f"{kind} {guard!r} on {name} is missing")
+        present = _live_guards(inspector, name)
+        for guard, want in _uniqueness_guards(table, dialect).items():
+            found = present.get(guard)
+            if found is None:
+                gaps.append(f"{want['kind']} {guard!r} on {name} is missing")
+            elif found["columns"] != want["columns"]:
+                gaps.append(f"{want['kind']} {guard!r} on {name} covers a different column set")
+            elif want["partial"] and found["partial"] is False:
+                gaps.append(f"{want['kind']} {guard!r} on {name} is not a partial index")
     return gaps
 
 

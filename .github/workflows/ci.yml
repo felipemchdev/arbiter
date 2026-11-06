@@ -49,7 +49,7 @@ jobs:
         run: ruff check --select E9,F app
 
       - name: Tests
-        run: pytest app/tests -v
+        run: pytest app/tests -v -m "not postgresql"
 
   postgres:
     name: Migrations on PostgreSQL
@@ -96,6 +96,15 @@ jobs:
         run: |
           python -m alembic upgrade head
           python -m alembic upgrade head
+
+      # The cascade is only visible where the keys are enforced, so a skipped test
+      # is a failure: on SQLite the same file proves nothing.
+      - name: Pipeline delete cascade on the migrated schema
+        run: |
+          set -euo pipefail
+          output=$(pytest app/tests/test_pipeline_delete_postgres.py -v -m postgresql 2>&1)
+          echo "$output"
+          echo "$output" | grep -q "1 passed"
 
       - name: Create the seed database
         run: |

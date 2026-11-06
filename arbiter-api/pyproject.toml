@@ -14,3 +14,8 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.pytest.ini_options]
+markers = [
+    "postgresql: needs a PostgreSQL database, given by DATABASE_URL",
+]

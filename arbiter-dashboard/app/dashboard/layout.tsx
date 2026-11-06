@@ -10,7 +10,9 @@ import { ThemeToggle } from '@/components/theme-toggle'
 const NAV_ITEMS = [
   { href: '/dashboard',            label: 'Overview'  },
   { href: '/dashboard/pipelines',  label: 'Pipelines' },
+  { href: '/dashboard/runs',       label: 'Runs'      },
   { href: '/dashboard/alerts',     label: 'Alerts'    },
+  { href: '/dashboard/notifications', label: 'Notifications' },
   { href: '/dashboard/api-keys',   label: 'API Keys'  },
 ]
 

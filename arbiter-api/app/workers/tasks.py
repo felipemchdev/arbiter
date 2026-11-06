@@ -11,6 +11,7 @@ from sqlalchemy.exc import OperationalError
 from app.core.database import async_session_maker
 from app.models.pipeline_run import PipelineRun
 from app.services.alert_service import check_stale_pipelines_sync, process_run_event_sync
+from app.services.notification_service import deliver_due_alerts
 
 logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
@@ -41,6 +42,24 @@ def process_run_event(self, run_id: str) -> None:
             await session.commit()
 
     asyncio.run(_run())
+
+
+@shared_task(
+    name="app.workers.tasks.deliver_pending_alerts",
+    bind=True,
+    autoretry_for=RETRYABLE_ERRORS,
+    max_retries=MAX_RETRIES,
+    default_retry_delay=RETRY_DELAY,
+    retry_backoff=True,
+)
+def deliver_pending_alerts(self) -> dict:
+    """Push every queued alert whose next attempt is due."""
+
+    async def _run() -> dict:
+        async with async_session_maker() as session:
+            return await deliver_due_alerts(session)
+
+    return asyncio.run(_run())
 
 
 @shared_task(

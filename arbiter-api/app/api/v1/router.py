@@ -4,6 +4,7 @@ from app.api.v1.alerts import router as alerts_router
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.health import router as health_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.pipelines import router as pipelines_router
 from app.api.v1.runs import router as runs_router
 
@@ -13,4 +14,5 @@ router.include_router(api_keys_router, prefix="/api-keys", tags=["api-keys"])
 router.include_router(pipelines_router, prefix="/pipelines", tags=["pipelines"])
 router.include_router(runs_router, prefix="/runs", tags=["runs"])
 router.include_router(alerts_router, prefix="/alerts", tags=["alerts"])
+router.include_router(notifications_router, prefix="/notification-channels", tags=["notifications"])
 router.include_router(health_router, tags=["health"])

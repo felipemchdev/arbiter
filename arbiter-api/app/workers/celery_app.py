@@ -19,6 +19,10 @@ celery_app.conf.update(
         "check-stale-pipelines-every-10-minutes": {
             "task": "app.workers.tasks.check_stale_pipelines",
             "schedule": 600.0,
-        }
+        },
+        "deliver-pending-alerts-every-minute": {
+            "task": "app.workers.tasks.deliver_pending_alerts",
+            "schedule": 60.0,
+        },
     },
 )

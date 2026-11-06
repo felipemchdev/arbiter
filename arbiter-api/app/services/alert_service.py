@@ -12,6 +12,7 @@ from app.models.alert import Alert, AlertType
 from app.core.config import settings
 from app.models.pipeline import Pipeline, RunStatus
 from app.models.pipeline_run import PipelineRun
+from app.services.notification_service import queue_alert_deliveries
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,9 @@ async def create_alert(
             pipeline_id, alert_type.value,
         )
         return None
+    # The outbox rows share this transaction: a stored alert is always delivered
+    # later, and a rolled back ingest leaves no delivery behind.
+    await queue_alert_deliveries(session, alert)
     logger.info("alert_created", extra={"pipeline_id": str(pipeline_id), "type": alert_type.value})
     return alert
 

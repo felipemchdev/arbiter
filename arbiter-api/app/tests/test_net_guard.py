@@ -6,7 +6,6 @@ import pytest
 
 import app.core.net_guard as net_guard
 from app.core.net_guard import check_reachable_url, check_stored_url
-from app.models.notification_channel import NotificationChannel
 from app.services import notification_service
 
 
@@ -95,12 +94,13 @@ async def test_send_webhook_refuses_a_private_target_before_any_request(monkeypa
         raise AssertionError("no client is built for a refused target")
 
     monkeypatch.setattr(notification_service, "async_client_factory", _factory)
-    channel = NotificationChannel(
-        name="internal", url="http://127.0.0.1:3924/hook", signing_secret="s", enabled=True
-    )
 
     status_code, error, delivered = await notification_service.send_webhook(
-        channel, {"a": 1}, delivery_id="00000000-0000-0000-0000-000000000001", attempt=1
+        "http://127.0.0.1:3924/hook",
+        "s",
+        {"a": 1},
+        delivery_id="00000000-0000-0000-0000-000000000001",
+        attempt=1,
     )
 
     assert delivered is False

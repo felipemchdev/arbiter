@@ -9,14 +9,18 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import settings
+from app.core.database import Base
 from app.core.security import hash_password
-from app.models.alert import Alert
+from app.models.alert import Alert, AlertType
 from app.models.alert_delivery import AlertDelivery, AlertDeliveryStatus
-from app.models.pipeline import Pipeline
+from app.models.notification_channel import NotificationChannel
+from app.models.organization import Organization
+from app.models.pipeline import Pipeline, PipelineSource
 from app.models.user import User
-from app.services import notification_service
+from app.services import notification_service, pipeline_service
 
 pytestmark = pytest.mark.asyncio
 
@@ -292,6 +296,64 @@ async def test_delete_channel_drops_its_queued_deliveries(
 
     assert response.status_code == 200
     assert await queue_of(session, organization) == []
+
+
+async def test_deleting_a_pipeline_removes_its_alert_deliveries():
+    engine = create_async_engine("sqlite+aiosqlite://")
+    try:
+        async with engine.connect() as connection:
+            await connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            await connection.run_sync(Base.metadata.create_all)
+            async with AsyncSession(bind=connection, expire_on_commit=False) as session:
+                org = Organization(name="cascade-org")
+                session.add(org)
+                await session.flush()
+                pipeline = Pipeline(org_id=org.id, name="doomed_etl", source=PipelineSource.sdk)
+                session.add(pipeline)
+                await session.flush()
+                channels = [
+                    NotificationChannel(
+                        org_id=org.id,
+                        name=f"doomed-{index}",
+                        url="https://hook.example.test/arbiter",
+                        signing_secret="arbwhk_test",
+                        enabled=True,
+                    )
+                    for index in range(2)
+                ]
+                session.add_all(channels)
+                await session.flush()
+                alert = Alert(
+                    pipeline_id=pipeline.id,
+                    type=AlertType.failure,
+                    message="run failed",
+                    resolved=False,
+                )
+                session.add(alert)
+                await session.flush()
+                session.add_all(
+                    [
+                        AlertDelivery(
+                            alert_id=alert.id,
+                            channel_id=channels[0].id,
+                            status=AlertDeliveryStatus.pending,
+                        ),
+                        AlertDelivery(
+                            alert_id=alert.id,
+                            channel_id=channels[1].id,
+                            status=AlertDeliveryStatus.delivered,
+                        ),
+                    ]
+                )
+                await session.commit()
+
+                deleted = await pipeline_service.delete_pipeline(session, str(pipeline.id), org.id)
+
+                assert deleted is True
+                assert (await session.scalars(select(AlertDelivery))).all() == []
+                assert (await session.scalars(select(Alert))).all() == []
+    finally:
+        await engine.dispose()
 
 
 async def test_test_endpoint_probes_without_queuing(

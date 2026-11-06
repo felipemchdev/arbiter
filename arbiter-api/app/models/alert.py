@@ -51,3 +51,6 @@ class Alert(Base):
 
     pipeline: Mapped["Pipeline"] = relationship(back_populates="alerts")
     run: Mapped["PipelineRun | None"] = relationship(back_populates="alerts")
+    deliveries: Mapped[list["AlertDelivery"]] = relationship(
+        back_populates="alert", cascade="all, delete-orphan"
+    )

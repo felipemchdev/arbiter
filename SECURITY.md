@@ -27,10 +27,13 @@ as its `.env`. Before exposing Arbiter:
   readable after the database forgets it.
 - `seed_prod.py` creates users but never overwrites an existing password; change
   credentials in the product rather than by re-running the seed.
-- Register webhook channels only for endpoints you control. An owner can point a
-  channel at any HTTP or HTTPS URL, including an internal one, so treat the
-  Notifications page as a network-egress control. Prefer `https://` URLs: the
-  alert body carries pipeline names, run ids and error text.
+- Register webhook channels only for endpoints you control. The API rejects a
+  channel URL whose host is a local name or a non-public address. It checks the
+  resolved address again before every send. A public name can still resolve to an
+  internal address after that check, because the client resolves it once more for
+  the connection. Run the worker in a network segment that cannot reach internal
+  services. Prefer `https://` URLs: the alert body carries pipeline names, run
+  ids and error text.
 - Arbiter stores each channel signing secret in clear text, because the worker
   must compute the HMAC of every body. The API never returns that secret after
   creation. Rotate it by deleting the channel and creating it again.

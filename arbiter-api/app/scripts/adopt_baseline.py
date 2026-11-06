@@ -17,6 +17,7 @@ active-alert index - is still missing.
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 
@@ -33,6 +34,19 @@ API_ROOT = Path(__file__).resolve().parents[2]
 
 # The get_indexes key that reports a partial index predicate, by driver.
 _PREDICATE_KEYS = {"postgresql": "postgresql_where", "sqlite": "sqlite_where"}
+
+
+def _normalized_predicate(clause) -> str | None:
+    """Reduce a WHERE clause to the text both sides of the comparison can agree on.
+
+    A driver may report the predicate with parentheses the model never wrote, and
+    both drivers allow any spacing. Only whitespace and grouping brackets are
+    removed; the operator spellings stay, so an index built for the wrong rows
+    reads as a different predicate rather than as an equivalent one.
+    """
+    if clause is None:
+        return None
+    return re.sub(r"[\s()]+", "", str(clause)).lower()
 
 
 def _script_directory() -> ScriptDirectory:
@@ -60,17 +74,20 @@ def _uniqueness_guards(table, dialect: str) -> dict[str, dict]:
                 "kind": "unique constraint",
                 "columns": frozenset(column.name for column in constraint.columns),
                 "partial": False,
+                "predicate": None,
             }
     for index in table.indexes:
         if not index.unique or not index.name:
             continue
         options = index.dialect_options.get(dialect) or {}
+        where = options.get("where")
         guards[index.name] = {
             "kind": "unique index",
             "columns": frozenset(column.name for column in index.columns),
             # None means "not compared", never "must be absent". A predicate is a
             # clause object, so it is tested with `is not None`, never with truthness.
-            "partial": (options.get("where") is not None) if reports_predicate else None,
+            "partial": (where is not None) if reports_predicate else None,
+            "predicate": _normalized_predicate(where) if reports_predicate else None,
         }
     return guards
 
@@ -81,9 +98,8 @@ def _live_guards(inspector, table_name: str) -> dict[str, dict]:
     A non-unique index is never a guard: a plain index can carry the name of a
     unique object and still allow the duplicate rows the application forbids. A
     driver may surface the same guard as a constraint or as an index, so both are
-    collected. Their columns are compared as a set, and a partial predicate only
-    where the driver reports one, because SQLite and PostgreSQL spell the same
-    predicate with different text.
+    collected. Their columns are compared as a set and their predicates as
+    normalized text, but only where the driver reports a predicate at all.
     """
     predicate_key = _PREDICATE_KEYS.get(inspector.dialect.name)
     guards: dict[str, dict] = {}
@@ -93,19 +109,20 @@ def _live_guards(inspector, table_name: str) -> dict[str, dict]:
                 "kind": "unique constraint",
                 "columns": frozenset(item.get("column_names") or ()),
                 "partial": False,
+                "predicate": None,
             }
     for item in inspector.get_indexes(table_name):
         if not item.get("name") or not item.get("unique"):
             continue
+        where = item.get("dialect_options", {}).get(predicate_key) if predicate_key else None
         guards.setdefault(
             item["name"],
             {
                 "kind": "unique index",
                 # An expression index reports no column names, so it never matches.
                 "columns": frozenset(item.get("column_names") or ()),
-                "partial": (item.get("dialect_options", {}).get(predicate_key) is not None)
-                if predicate_key
-                else None,
+                "partial": (where is not None) if predicate_key else None,
+                "predicate": _normalized_predicate(where) if predicate_key else None,
             },
         )
     return guards
@@ -134,6 +151,8 @@ def _schema_gaps(inspector, tables: set[str]) -> list[str]:
                 gaps.append(f"{want['kind']} {guard!r} on {name} covers a different column set")
             elif want["partial"] and found["partial"] is False:
                 gaps.append(f"{want['kind']} {guard!r} on {name} is not a partial index")
+            elif want["partial"] and found["predicate"] != want["predicate"]:
+                gaps.append(f"{want['kind']} {guard!r} on {name} has a different predicate")
     return gaps
 
 

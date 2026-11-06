@@ -138,6 +138,28 @@ def test_refuses_a_guard_without_its_partial_predicate(tmp_path):
     assert "unique index 'uq_active_alert' on alerts is not a partial index" in gaps
 
 
+def test_refuses_a_guard_with_the_wrong_predicate(tmp_path):
+    """An index over resolved rows lets every live duplicate through."""
+    gaps = _rebuilt_alert_index(
+        tmp_path,
+        "wrong_predicate.db",
+        "CREATE UNIQUE INDEX uq_active_alert "
+        "ON alerts (pipeline_id, type, run_id, message) WHERE resolved = 1",
+    )
+    assert "unique index 'uq_active_alert' on alerts has a different predicate" in gaps
+
+
+def test_accepts_a_guard_written_with_other_spacing(tmp_path):
+    """Spacing and grouping brackets are spelling, not a different rule."""
+    gaps = _rebuilt_alert_index(
+        tmp_path,
+        "spaced_predicate.db",
+        "CREATE UNIQUE INDEX uq_active_alert "
+        "ON alerts (pipeline_id, type, run_id, message) WHERE (resolved = 0)",
+    )
+    assert gaps == []
+
+
 def test_create_all_schema_carries_the_migration_guards():
     """The models mirror the revisions, so databases the seeders build are adoptable."""
     engine = create_engine("sqlite:///:memory:")

@@ -48,5 +48,5 @@ class AlertDelivery(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
 
-    alert: Mapped["Alert"] = relationship()
+    alert: Mapped["Alert"] = relationship(back_populates="deliveries")
     channel: Mapped["NotificationChannel"] = relationship(back_populates="deliveries")

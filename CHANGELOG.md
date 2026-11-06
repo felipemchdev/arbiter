@@ -34,7 +34,12 @@ All notable changes to Arbiter are documented in this file.
   failed on an empty database
 - Baseline adoption now checks the uniqueness guards of revisions 0002 and 0003 — their
   name, columns and partial predicate — before it stamps a schema, so a plain index that
-  only borrows a guard name no longer passes
+  only borrows a guard name no longer passes. The predicate text is compared after
+  spacing and grouping brackets are removed
+- Deleting a pipeline that has alert delivery records removes those records with it, so
+  PostgreSQL no longer refuses the delete with a foreign key error
+- The delivery worker closes its read transaction before it posts a webhook, so a slow
+  receiver no longer holds a database connection and an open transaction
 - Migration 0012 created `alert_deliveries` without the `is_test` column the model
   declares, so a migrated database failed every test send; revision 0013 adds it
 - Revision 0014 keeps one open `no_run` alert per pipeline and removes the duplicates a

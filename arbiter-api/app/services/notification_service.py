@@ -54,7 +54,8 @@ def sign_body(secret: str, body: bytes) -> str:
 
 
 async def send_webhook(
-    channel: NotificationChannel,
+    url: str,
+    signing_secret: str,
     payload: dict,
     *,
     delivery_id,
@@ -62,29 +63,30 @@ async def send_webhook(
 ) -> tuple[int | None, str | None, bool]:
     """POST one payload. Return (response status code, error text, delivered).
 
-    The URL is re-checked before the request: a public name can resolve to an
-    internal address after the channel was saved.
+    The target is taken as plain text, not as a channel row, so the caller can
+    close its read transaction before the network call. The URL is re-checked
+    here: a public name can resolve to an internal address after it was stored.
     """
     body = canonical_json(payload)
     headers = {
         "Content-Type": "application/json",
         "User-Agent": USER_AGENT,
-        SIGNATURE_HEADER: sign_body(channel.signing_secret, body),
+        SIGNATURE_HEADER: sign_body(signing_secret, body),
         DELIVERY_HEADER: str(delivery_id),
         ATTEMPT_HEADER: str(attempt),
     }
     try:
-        await check_reachable_url(channel.url)
+        await check_reachable_url(url)
     except ValueError as exc:
         return None, str(exc)[:MAX_ERROR_LENGTH], False
 
     try:
         async with async_client_factory(timeout=settings.notification_timeout_seconds) as client:
-            response = await client.post(channel.url, content=body, headers=headers)
+            response = await client.post(url, content=body, headers=headers)
     except httpx.HTTPError as exc:
         return None, f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LENGTH], False
     except Exception as exc:  # noqa: BLE001
-        logger.exception("webhook_send_crashed channel_id=%s", channel.id)
+        logger.exception("webhook_send_crashed delivery_id=%s", delivery_id)
         return None, f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LENGTH], False
 
     if 200 <= response.status_code < 300:
@@ -255,8 +257,11 @@ async def _deliver_one(
         delivery_id=delivery.id,
         attempt=delivery.attempts,
     )
+    # Close the read transaction: a slow receiver must not hold it during the network call.
+    await session.commit()
+
     status_code, error, delivered = await send_webhook(
-        channel, payload, delivery_id=delivery.id, attempt=delivery.attempts
+        channel.url, channel.signing_secret, payload, delivery_id=delivery.id, attempt=delivery.attempts
     )
     delivery.response_status_code = status_code
     delivery.last_error = error
@@ -451,7 +456,7 @@ async def test_channel_send(session: AsyncSession, channel: NotificationChannel)
         "run": None,
     }
     status_code, error, delivered = await send_webhook(
-        channel, payload, delivery_id="test", attempt=1
+        channel.url, channel.signing_secret, payload, delivery_id="test", attempt=1
     )
     return {
         "delivered": delivered,

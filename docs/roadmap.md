@@ -6,6 +6,11 @@ before you open a feature issue.
 Sentences in this file use controlled technical English. One idea per
 sentence. Active voice.
 
+## What This File Describes
+
+The state of Arbiter on `develop`, plus the work in the pull request that
+changes this file. After that pull request merges, `develop` holds all of it.
+
 ## What Arbiter Does Today
 
 The API stores runs, task instances, DAGs and alerts. An owner creates API
@@ -20,22 +25,35 @@ Celery Beat runs `check_stale_pipelines` every 10 minutes. That task creates
 one `no_run` alert for each pipeline with no run in the last
 `stale_pipeline_hours` hours. The default is 24 hours.
 
+Each new alert queues one delivery row per active webhook channel, in the same
+transaction. Celery Beat runs `deliver_pending_alerts` every minute. That task
+signs each body with HMAC-SHA256, posts it and stores the answer. A failed send
+retries with an exponential backoff and stops after five attempts. See ADR-002.
+
+The API compares the duration of a run with the budget of its pipeline. An
+owner sets that budget with `slow_threshold_ms`. Without it, the API uses the
+95th percentile of recent successful runs. A longer run creates a
+`duration_exceeded` alert.
+
 The dashboard shows the overview, the pipeline list, one DAG, the task
-timeline, metrics, alerts and API keys. It runs on Next.js with NextAuth.
+timeline, metrics, the run browser, alerts, notification channels and API
+keys. The run browser filters runs by status, pipeline, date window and free
+text. The list endpoints take the same style of filters. It runs on Next.js
+with NextAuth.
 
 The SDK reports a run with the `Arbiter.monitor` decorator or with
 `ArbiterClient.send_run`. The collector reads metadata from Airflow only.
 
 Docker Compose starts PostgreSQL, Redis, the API, the Celery worker, Celery
 Beat and the dashboard. CI checks the API, the packages and the dashboard on
-every push.
+every push, and applies the migrations against PostgreSQL.
 
 ## What Arbiter Does Not Do Yet
 
-- Arbiter does not tell anyone about an alert. Alerts stay in the database
-  until a person opens the dashboard.
-- Arbiter does not compare a run duration with a limit. `AlertType` has the
-  value `duration_exceeded`, but no code creates that alert.
+- Arbiter sends an alert only to a webhook channel. It has no email, Slack or
+  PagerDuty receiver.
+- Every active channel in the organisation receives every alert. Arbiter does
+  not route an alert to one pipeline owner or to one person.
 - One global setting controls freshness. A pipeline that runs hourly and a
   pipeline that runs weekly share the same `stale_pipeline_hours` value.
 - Arbiter has no routes for users. Scripts create the first users. A running
@@ -45,35 +63,11 @@ every push.
 - No job publishes `arbiter-sdk`. Users install it from source.
 - The collector supports Airflow only.
 
-## Work In Review
-
-Two pull requests change the base. Do not start work that depends on them
-until they merge into `develop`.
-
-- PR #226 adds a per-pipeline duration limit and the `duration_exceeded`
-  alert.
-- PR #227 adds the run browser and filters for runs, pipelines and alerts.
-
 ## Next Work
 
-The list is ordered. Item 1 has the largest effect on daily use.
+The list is ordered by the effect each item has on daily use.
 
-### 1. Alert notifications
-
-**Problem.** A team must open the dashboard to learn that a pipeline failed.
-That delay can be hours.
-
-**Change.** Add notification channels for one organisation. Send each new
-alert to every channel. Retry a failed send. Show the channels and their
-delivery state in the dashboard.
-
-**Done when.** A failed run causes one HTTPS POST to a test endpoint within
-one worker cycle. The dashboard shows that delivery and its response code.
-Repeating the same alert does not create a second open alert. Deleting a
-channel stops its sends. `docs/api-integration.md` documents the payload and
-the signature header.
-
-### 2. Per-pipeline freshness budget
+### 1. Per-pipeline freshness budget
 
 **Problem.** One global `stale_pipeline_hours` value fits every schedule
 badly. It alerts too late for hourly pipelines and too early for weekly
@@ -85,8 +79,22 @@ interval. Use the pipeline value in `check_stale_pipelines`.
 
 **Done when.** Two pipelines with different intervals get correct `no_run`
 alerts in one worker cycle. The API accepts and returns the interval. The
-pipeline page shows it and edits it. Migration 0010 or later adds the column
+pipeline page shows it and edits it. A new alembic revision adds the column
 with a null default.
+
+### 2. Alert routing per pipeline and per person
+
+**Problem.** Every active channel in an organisation receives every alert. A
+team that owns one pipeline reads alerts for all pipelines, or it mutes a
+channel and loses all of them.
+
+**Change.** Let an owner attach channels to a pipeline, and users to a
+channel. Send an alert only to the channels of its pipeline. Keep the current
+behaviour when a pipeline has no channel.
+
+**Done when.** Two pipelines with different channels get different webhook
+posts in one worker cycle. A muted channel receives nothing. The dashboard
+shows the routing on the pipeline page.
 
 ### 3. Data retention
 
@@ -144,7 +152,7 @@ triggers the publish job. The job fails when the tests fail.
 - Storage and display of task log text from the `log_output` column.
 - Bulk reprocess of past runs after an alert rule changes.
 - Sign-in with an identity provider, such as OIDC or SAML.
-- Per-user notification preferences, so each person chooses their channels.
+- Email, Slack and PagerDuty receivers next to the webhook receiver.
 - Deployment of Arbiter on Kubernetes with a Helm chart.
 
 ## Non-Goals

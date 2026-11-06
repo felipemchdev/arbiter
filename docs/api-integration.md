@@ -65,21 +65,29 @@ client needs them.
 | POST | /api/v1/api-keys | An owner | The new key, shown one time only |
 | POST | /api/v1/api-keys/:id/revoke | An owner | A confirmation message |
 | DELETE | /api/v1/api-keys/:id | An owner | A confirmation message |
+| GET | /api/v1/notification-channels | Any valid credential | The webhook channels, with the last delivery of each |
+| POST | /api/v1/notification-channels | An owner | The new channel and its signing secret, shown one time only |
+| PATCH | /api/v1/notification-channels/:id | An owner | The channel with the changed fields |
+| POST | /api/v1/notification-channels/:id/test | An owner | The result of one sample send |
+| DELETE | /api/v1/notification-channels/:id | An owner | A confirmation message |
+| GET | /api/v1/notification-channels/deliveries | Any valid credential | One page of delivery attempts, with optional filters |
 
 ## Procedure: Filter a list
 
-Every list endpoint takes `limit` and `offset`. Three endpoints take more filters.
+Every list endpoint takes `limit` and `offset`. Four endpoints take more filters.
 
 | Endpoint | Extra filters |
 | --- | --- |
 | `GET /api/v1/runs` | `status`, `pipeline_id`, `started_from`, `started_to`, `q` |
 | `GET /api/v1/pipelines` | `status`, `q` |
 | `GET /api/v1/alerts` | `type`, `resolved`, `pipeline_id` |
+| `GET /api/v1/notification-channels/deliveries` | `status`, `channel_id` |
 
 | Filter | Result |
 | --- | --- |
-| `status` | Runs with that status, or pipelines whose last run had that status |
+| `status` | Runs with that status, pipelines whose last run had that status, or deliveries in that state |
 | `pipeline_id` | Only the rows of one pipeline |
+| `channel_id` | Only the deliveries of one channel |
 | `type` | Only the alerts of one alert type |
 | `resolved` | Open alerts with `false`, resolved alerts with `true`. The default keeps open alerts. |
 | `q` | Rows whose run id or error text contains the search term. The match ignores letter case. |
@@ -154,3 +162,95 @@ negative value, and for a value that is not a number.
 Send `"slow_threshold_ms": null` to remove the budget. The API then compares
 each run with the 95th percentile of the last successful runs of the same
 pipeline. It creates no alert while that history stays short.
+
+## Procedure: Register a webhook channel
+
+A channel is one HTTPS endpoint that receives alert notifications. One
+organisation can register ten channels.
+
+1. Open the Notifications page in the dashboard as an owner.
+2. Select **New channel**, enter a name and the endpoint URL, then select
+   **Create channel**.
+3. Copy the signing secret. The API shows it once. Store it in your receiver.
+4. Select **Test** on the new row. The API sends one sample payload now and
+   shows the answer.
+
+Use the API when you do not want the dashboard:
+
+```sh
+curl -X POST http://localhost:8000/api/v1/notification-channels \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "on-call", "url": "https://example.com/arbiter/hooks", "enabled": true}'
+```
+
+The URL must start with `http://` or `https://`. The API answers 422 for any
+other scheme.
+
+## Alert notification payload
+
+The worker sends one `POST` per alert and per channel. The body is JSON:
+
+```json
+{
+  "delivery_id": "0f3c…",
+  "attempt": 1,
+  "sent_at": "2026-11-05T12:00:00+00:00",
+  "alert": {
+    "id": "9b2d…",
+    "type": "failure",
+    "message": "Run nightly-1 failed",
+    "resolved": false,
+    "created_at": "2026-11-05T11:59:58+00:00"
+  },
+  "pipeline": { "id": "4a71…", "name": "nightly_etl" },
+  "run": {
+    "id": "7742…",
+    "run_id": "nightly-1",
+    "status": "failed",
+    "started_at": "2026-11-05T11:00:00+00:00",
+    "finished_at": "2026-11-05T11:59:58+00:00",
+    "duration_ms": 3598000,
+    "error_message": "row count mismatch"
+  }
+}
+```
+
+`run` is `null` for a `no_run` alert. No run exists for that alert.
+
+These headers accompany the body:
+
+| Header | Value |
+| --- | --- |
+| `X-Arbiter-Signature` | `sha256=<hmac>` of the raw request body |
+| `X-Arbiter-Delivery` | The `delivery_id` of this row |
+| `X-Arbiter-Attempt` | The attempt number, starting at 1 |
+| `User-Agent` | `arbiter-webhook/0.1` |
+
+Verify the signature with the channel secret before you trust the body:
+
+```python
+import hashlib, hmac
+
+expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+if received_signature != "sha256=" + expected:
+    abort(400)
+```
+
+Hash the bytes you received. Do not re-encode the parsed JSON: a different key
+order or spacing gives a different digest.
+
+## Delivery states
+
+Each alert and channel pair creates one delivery row:
+
+| State | Meaning |
+| --- | --- |
+| `pending` | The worker has not delivered the alert yet. It retries with an exponential backoff. |
+| `delivered` | The endpoint answered `2xx`. |
+| `failed` | The endpoint never answered `2xx`, or the channel was removed. The worker stops. |
+
+The worker sends every due delivery once per minute. Set
+`NOTIFICATION_MAX_ATTEMPTS` and `NOTIFICATION_BACKOFF_SECONDS` to change that
+policy. A channel that you mute receives no new delivery rows. A duplicate
+alert creates no second delivery.

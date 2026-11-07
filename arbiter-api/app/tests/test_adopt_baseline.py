@@ -199,6 +199,24 @@ def test_refuses_a_guard_whose_literal_is_written_in_another_case(tmp_path, scri
         assert "alembic_version" not in inspect(connection).get_table_names()
 
 
+def test_refuses_no_run_guard_with_cast_syntax_inside_literal(tmp_path, script_directory):
+    """Cast-like text is part of the value and must never authorize a schema stamp."""
+    engine = _create_all_db(tmp_path, "literal_cast_predicate.db")
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_open_no_run_alert"'))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_open_no_run_alert ON alerts (pipeline_id) "
+                "WHERE resolved = 0 AND type = 'no_run::text'"
+            )
+        )
+
+    with engine.connect() as connection:
+        assert "unique index 'uq_open_no_run_alert' on alerts has a different predicate" in _live_gaps(connection)
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
 def _create_all_db(tmp_path, db_name: str):
     """Return a SQLite database built by create_all, so it has no alembic_version row."""
     engine = create_engine(f"sqlite:///{tmp_path / db_name}")

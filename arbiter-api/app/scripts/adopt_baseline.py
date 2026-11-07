@@ -81,7 +81,8 @@ def _normalized_predicate(clause) -> str | None:
         literals.append(match.group(0))
         return f"\x00{len(literals) - 1}\x00"
 
-    skeleton = _PREDICATE_NOISE.sub("", _SQL_LITERAL.sub(_reserve, _INFERRED_CAST.sub("", str(clause))))
+    skeleton = _SQL_LITERAL.sub(_reserve, str(clause))
+    skeleton = _PREDICATE_NOISE.sub("", _INFERRED_CAST.sub("", skeleton))
     return _LITERAL_SLOT.sub(lambda slot: literals[int(slot.group(1))], skeleton.lower())
 
 

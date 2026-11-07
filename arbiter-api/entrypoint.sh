@@ -1,13 +1,16 @@
 #!/bin/sh
 set -e
 
+echo "[bootstrap] Adopting schemas created without Alembic history..."
+python -m app.scripts.adopt_baseline
+
 echo "[bootstrap] Running migrations..."
 alembic upgrade head
 
 if [ "${RUN_SEEDS:-false}" = "true" ]; then
   echo "[bootstrap] Running OSS seeds..."
   python -m app.scripts.seed_dev
-  python -m app.scripts.seed_helios
+  python -m app.scripts.seed_demo
 else
   echo "[bootstrap] Skipping OSS seeds (RUN_SEEDS not set)"
 fi
@@ -20,4 +23,7 @@ else
 fi
 
 echo "[bootstrap] Starting API..."
+if [ "${RELOAD:-false}" = "true" ]; then
+  exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+fi
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000

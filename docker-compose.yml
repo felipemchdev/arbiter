@@ -4,16 +4,28 @@ services:
     environment:
       POSTGRES_DB: arbiter
       POSTGRES_USER: arbiter
-      POSTGRES_PASSWORD: arbiter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arbiter -d arbiter"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
 
   api:
     build: ./arbiter-api
@@ -21,27 +33,38 @@ services:
       - "8000:8000"
     env_file: .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./arbiter-api:/app
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    environment:
+      RELOAD: "true"
+    command: ["/entrypoint.sh"]
+    restart: unless-stopped
 
   worker:
     build: ./arbiter-api
     env_file: .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     command: celery -A app.workers.celery_app worker --loglevel=info
+    restart: unless-stopped
 
   beat:
     build: ./arbiter-api
     env_file: .env
     depends_on:
-      - postgres
-      - redis
-    command: celery -A app.workers.celery_app beat --loglevel=info
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    restart: unless-stopped
 
   dashboard:
     build: ./arbiter-dashboard
@@ -49,7 +72,9 @@ services:
       - "3000:3000"
     env_file: .env
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:

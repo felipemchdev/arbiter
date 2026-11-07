@@ -17,6 +17,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger(__name__)
 
 
+def to_duration_ms(source: dict) -> int | None:
+    """Return a duration in milliseconds.
+
+    Airflow's ``duration`` is seconds while ``duration_ms`` is already milliseconds,
+    so only the seconds field is scaled — multiplying both inflated stored durations
+    by 1000x.
+    """
+    raw_ms = source.get("duration_ms")
+    if raw_ms is not None:
+        return int(raw_ms)
+    raw_seconds = source.get("duration")
+    if raw_seconds is not None:
+        return int(float(raw_seconds) * 1000)
+    return None
+
+
 def build_payload(airflow_client: AirflowClient) -> dict:
     dags_payload: list[dict] = []
     for dag in airflow_client.get_dags():
@@ -36,7 +52,7 @@ def build_payload(airflow_client: AirflowClient) -> dict:
                     "status": run.get("state") or run.get("status", "running"),
                     "started_at": run.get("start_date") or run.get("started_at"),
                     "finished_at": run.get("end_date") or run.get("finished_at"),
-                    "duration_ms": int((run.get("duration_ms") or run.get("duration") or 0) * 1000) if (run.get("duration_ms") or run.get("duration")) else None,
+                    "duration_ms": to_duration_ms(run),
                     "error_message": run.get("error_message"),
                     "tasks": [
                         {
@@ -44,7 +60,7 @@ def build_payload(airflow_client: AirflowClient) -> dict:
                             "status": ti.get("state") or ti.get("status", "running"),
                             "started_at": ti.get("start_date") or ti.get("started_at"),
                             "finished_at": ti.get("end_date") or ti.get("finished_at"),
-                            "duration_ms": int((ti.get("duration_ms") or ti.get("duration") or 0) * 1000) if (ti.get("duration_ms") or ti.get("duration")) else None,
+                            "duration_ms": to_duration_ms(ti),
                             "try_number": ti.get("try_number", 1),
                             "log_url": ti.get("log_url"),
                             "error_message": ti.get("error_message"),

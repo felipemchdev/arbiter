@@ -3,20 +3,43 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_org, get_db
 from app.api.role_guard import require_owner
-from app.schemas.pipeline import DagDefinitionRead, PipelineCreate, PipelineDetail, PipelineRead, PipelineRunSummary
-from app.services.pipeline_service import create_pipeline, delete_pipeline, get_pipeline, get_pipeline_runs, list_pipelines
+from app.models.pipeline import RunStatus
+from app.schemas.page import Page
+from app.schemas.pipeline import (
+    DagDefinitionRead,
+    PipelineCreate,
+    PipelineDetail,
+    PipelineRead,
+    PipelineRunSummary,
+    PipelineUpdate,
+)
+from app.services.pipeline_service import (
+    create_pipeline,
+    delete_pipeline,
+    get_pipeline,
+    get_pipeline_runs,
+    list_pipelines,
+    update_pipeline,
+)
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[PipelineRead])
+@router.get("", response_model=Page[PipelineRead])
 async def read_pipelines(
     current_org=Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
+    # "status" is the public name; the module already imports fastapi's status helper.
+    run_status: RunStatus | None = Query(default=None, alias="status"),
+    q: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
-    return await list_pipelines(db, current_org.id, limit=limit, offset=offset)
+    """List the pipelines of the organisation, with optional name and status filters."""
+    items, total = await list_pipelines(
+        db, current_org.id, run_status=run_status, query=q, limit=limit, offset=offset
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.post("", response_model=PipelineRead, status_code=status.HTTP_201_CREATED)
@@ -25,7 +48,9 @@ async def create_pipeline_endpoint(
     current_org=Depends(require_owner),
     db: AsyncSession = Depends(get_db),
 ):
-    return await create_pipeline(db, current_org.id, payload)
+    pipeline = await create_pipeline(db, current_org.id, payload)
+    await db.commit()
+    return pipeline
 
 
 @router.get("/{pipeline_id}", response_model=PipelineDetail)
@@ -43,6 +68,7 @@ async def read_pipeline(
         "name": pipeline.name,
         "source": pipeline.source,
         "dag_id": pipeline.dag_id,
+        "slow_threshold_ms": pipeline.slow_threshold_ms,
         "last_run_status": pipeline.last_run_status,
         "last_run_at": pipeline.last_run_at,
         "created_at": pipeline.created_at,
@@ -53,7 +79,21 @@ async def read_pipeline(
     return PipelineDetail.model_validate(payload)
 
 
-@router.get("/{pipeline_id}/runs", response_model=list[PipelineRunSummary])
+@router.patch("/{pipeline_id}", response_model=PipelineRead)
+async def patch_pipeline(
+    pipeline_id: str,
+    payload: PipelineUpdate,
+    current_org=Depends(require_owner),
+    db: AsyncSession = Depends(get_db),
+):
+    pipeline = await update_pipeline(db, pipeline_id, current_org.id, payload)
+    if pipeline is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
+    await db.commit()
+    return pipeline
+
+
+@router.get("/{pipeline_id}/runs", response_model=Page[PipelineRunSummary])
 async def read_pipeline_runs(
     pipeline_id: str,
     current_org=Depends(get_current_org),
@@ -64,7 +104,8 @@ async def read_pipeline_runs(
     pipeline = await get_pipeline(db, pipeline_id, current_org.id)
     if pipeline is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="pipeline not found")
-    return await get_pipeline_runs(db, pipeline.id, limit, offset)
+    items, total = await get_pipeline_runs(db, pipeline.id, limit, offset)
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.delete("/{pipeline_id}", status_code=status.HTTP_204_NO_CONTENT)

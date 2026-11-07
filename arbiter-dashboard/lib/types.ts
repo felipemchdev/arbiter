@@ -3,6 +3,13 @@ export type TaskStatus = RunStatus | "upstream_failed";
 export type PipelineSource = "airflow" | "azure_function" | "sdk";
 export type AlertType = "failure" | "duration_exceeded" | "no_run";
 
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface DagNode {
   id: string;
   label: string;
@@ -25,6 +32,7 @@ export interface Pipeline {
   name: string;
   source: PipelineSource;
   dag_id?: string | null;
+  slow_threshold_ms?: number | null;
   last_run_status?: RunStatus | null;
   last_run_at?: string | null;
   created_at: string;
@@ -43,6 +51,10 @@ export interface PipelineRun {
   created_at: string;
 }
 
+export interface RunListItem extends PipelineRun {
+  pipeline_name: string;
+}
+
 export interface TaskInstance {
   id: string;
   run_id: string;
@@ -55,7 +67,7 @@ export interface TaskInstance {
   log_url?: string | null;
   error_message?: string | null;
   log_output?: string | null;
-  input_params?: string | null;
+  input_params?: Record<string, unknown> | null;
 }
 
 export interface Alert {
@@ -91,4 +103,36 @@ export interface ApiKeyCreated {
   api_key: string;
   prefix: string;
   id: string;
+}
+
+export interface AlertDelivery {
+  id: string;
+  alert_id: string;
+  channel_id: string;
+  status: "pending" | "delivered" | "failed";
+  attempts: number;
+  response_status_code: number | null;
+  last_error: string | null;
+  next_attempt_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationChannel {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  created_at: string;
+  last_delivery: AlertDelivery | null;
+}
+
+export interface NotificationChannelCreated extends NotificationChannel {
+  signing_secret: string;
+}
+
+export interface TestSendResult {
+  delivered: boolean;
+  status_code: number | null;
+  error: string | null;
 }

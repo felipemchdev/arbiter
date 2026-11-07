@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pytest
 
 from app.core.config import Settings
 
@@ -109,3 +108,90 @@ class TestSettingsDefaults:
         """By default exactly one origin is configured."""
         settings = Settings(_env_file=None)  # type: ignore[call-arg]
         assert len(settings.cors_origins) == 1
+
+
+class TestSecretKeyGuard:
+    """Default SECRET_KEY must not survive into a non-development environment."""
+
+    def test_default_key_allowed_in_development(self):
+        settings = Settings(_env_file=None, environment="development")  # type: ignore[call-arg]
+        assert settings.secret_key == "change-me-in-production"
+
+    def test_default_key_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            Settings(_env_file=None, environment="production")  # type: ignore[call-arg]
+
+    def test_custom_key_accepted_in_production(self):
+        settings = Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            environment="production",
+            secret_key="a-long-random-secret-value-that-is-at-least-32-chars",
+        )
+        assert settings.secret_key == "a-long-random-secret-value-that-is-at-least-32-chars"
+
+    def test_empty_key_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            Settings(_env_file=None, environment="production", secret_key="   ")  # type: ignore[call-arg]
+
+    def test_documented_placeholder_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="SECRET_KEY"):
+            Settings(  # type: ignore[call-arg]
+                _env_file=None,
+                environment="production",
+                secret_key="CHANGE_ME_run_openssl_rand_hex_32",
+            )
+
+    def test_short_key_rejected_in_production(self):
+        import pytest
+
+        with pytest.raises(RuntimeError, match="at least"):
+            Settings(  # type: ignore[call-arg]
+                _env_file=None,
+                environment="production",
+                secret_key="short-but-not-a-placeholder",
+            )
+
+    def test_placeholder_only_warns_in_development(self, caplog):
+        settings = Settings(  # type: ignore[call-arg]
+            _env_file=None,
+            environment="development",
+            secret_key="CHANGE_ME_run_openssl_rand_hex_32",
+        )
+        assert settings.secret_key == "CHANGE_ME_run_openssl_rand_hex_32"
+
+    def test_unknown_environment_rejected(self):
+        import pytest
+
+        with pytest.raises(ValueError):
+            Settings(_env_file=None, environment="prod")  # type: ignore[call-arg]
+
+
+class TestHashVerification:
+    """A corrupt hash must return False rather than raising NameError."""
+
+    def test_verify_password_with_corrupt_hash(self):
+        from app.core.security import verify_password
+
+        assert verify_password("whatever", "not-a-valid-argon2-hash") is False
+
+    def test_verify_refresh_token_with_corrupt_hash(self):
+        from app.core.security import verify_refresh_token
+
+        assert verify_refresh_token("whatever", "$argon2id$broken") is False
+
+    def test_verify_api_key_with_corrupt_hash(self):
+        from app.core.security import verify_api_key
+
+        assert verify_api_key("whatever", "garbage") is False
+
+    def test_access_token_carries_token_version(self):
+        from app.core.security import create_access_token, decode_access_token
+
+        payload = decode_access_token(create_access_token(sub="u", org_id="o", role="owner", token_version=4))
+        assert payload["tv"] == 4

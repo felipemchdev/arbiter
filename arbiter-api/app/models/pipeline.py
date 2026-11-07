@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -31,6 +31,7 @@ class Pipeline(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     source: Mapped[PipelineSource] = mapped_column(Enum(PipelineSource, name="pipelinesource"), nullable=False)
     dag_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    slow_threshold_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_run_status: Mapped[RunStatus | None] = mapped_column(Enum(RunStatus, name="runstatus"), nullable=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

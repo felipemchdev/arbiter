@@ -5,11 +5,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.pipeline import PipelineSource, RunStatus
 
+INT32_MAX = 2_147_483_647
+
 
 class PipelineCreate(BaseModel):
     name: str
     source: PipelineSource
     dag_id: str | None = None
+    slow_threshold_ms: int | None = Field(default=None, ge=1, le=INT32_MAX)
+
+
+class PipelineUpdate(BaseModel):
+    """Partial update of the pipeline settings an owner controls."""
+
+    slow_threshold_ms: int | None = Field(default=None, ge=1, le=INT32_MAX)
 
 
 class DagDefinitionRead(BaseModel):
@@ -27,6 +36,7 @@ class PipelineRead(BaseModel):
     name: str
     source: PipelineSource
     dag_id: str | None
+    slow_threshold_ms: int | None = None
     last_run_status: RunStatus | None
     last_run_at: datetime | None
     created_at: datetime
@@ -47,3 +57,10 @@ class PipelineRunSummary(BaseModel):
     duration_ms: int | None
     error_message: str | None
     created_at: datetime
+
+
+class PipelineRunDetail(PipelineRunSummary):
+    """One row of the organisation-wide run list, tagged with its pipeline."""
+
+    pipeline_id: UUID
+    pipeline_name: str

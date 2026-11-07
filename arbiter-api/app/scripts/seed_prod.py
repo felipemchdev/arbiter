@@ -6,13 +6,20 @@ import uuid
 
 from sqlalchemy import select
 
-from app.core.database import async_session_maker, init_models
+from app.core.database import async_session_maker
 from app.core.security import hash_password
 from app.models.organization import Organization
 from app.models.user import User
 
 
 async def main() -> None:
+    """Create the organization and the owner named by ``ARBITER_ADMIN_*``.
+
+    This is the only production bootstrap path: docker-compose.prod.yml requires
+    both variables, so an empty database always gets a login. An existing user is
+    left alone, which keeps a password changed in the product intact. A user whose
+    role differs from the one asked for stops the bootstrap with a non-zero exit.
+    """
     admin_user = os.getenv("ARBITER_ADMIN_USER", "").strip()
     admin_pass = os.getenv("ARBITER_ADMIN_PASSWORD", "").strip()
     viewer_user = os.getenv("ARBITER_VIEWER_USER", "").strip()
@@ -52,10 +59,15 @@ async def main() -> None:
                 session.add(user)
                 print(f"[seed:prod] User created: {u['email']} ({u['role']})")
             else:
-                existing.hashed_password = hash_password(u["password"])
-                existing.role = u["role"]
-                session.add(existing)
-                print(f"[seed:prod] User updated: {u['email']} ({u['role']})")
+                # Never re-hash on restart: it wastes CPU and would silently
+                # roll back passwords changed from the dashboard.
+                if existing.role != u["role"]:
+                    print(
+                        f"[seed:prod] Error: {u['email']} already exists with role "
+                        f"{existing.role}, this deployment needs role {u['role']}"
+                    )
+                    raise SystemExit(1)
+                print(f"[seed:prod] User already exists, skipping: {u['email']}")
 
         await session.commit()
         print("[seed:prod] Done.")

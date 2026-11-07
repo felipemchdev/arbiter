@@ -1,0 +1,394 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+from sqlalchemy import create_engine, inspect, text
+
+import app.models  # noqa: F401
+from app.core.database import Base
+from app.scripts.adopt_baseline import (
+    _adopt,
+    _normalized_predicate,
+    _schema_gaps,
+    _script_directory,
+)
+
+
+@pytest.fixture(scope="module")
+def script_directory():
+    """Load the migration scripts once; the tests only read them."""
+    return _script_directory()
+
+
+def _live_gaps(connection) -> list[str]:
+    """Return every reason the live schema is not compatible with the models."""
+    inspector = inspect(connection)
+    return _schema_gaps(inspector, set(inspector.get_table_names()))
+
+
+def test_adopts_schema_created_without_history(tmp_path, script_directory):
+    """A create_all schema has no alembic_version row, so the head is stamped."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'history_less.db'}")
+    Base.metadata.create_all(engine)
+
+    with engine.connect() as connection:
+        assert _adopt(connection, script_directory) == 0
+        connection.commit()
+        stamped = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
+
+    assert stamped == [script_directory.get_current_head()]
+
+
+def test_refuses_partial_schema(tmp_path, script_directory):
+    """A schema missing a model table must not be claimed as migrated."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'partial.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE alerts"))
+
+    with engine.connect() as connection:
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_schema_without_a_unique_index(tmp_path, script_directory):
+    """Alembic 0003 protects active alerts from duplicates; stamping must not skip it."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'no_alert_index.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "unique index 'uq_active_alert' on alerts is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+
+
+def test_refuses_schema_without_a_unique_constraint(tmp_path, script_directory):
+    """Alembic 0002 protects (pipeline_id, run_id); a schema without it is refused."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'no_run_guard.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE pipeline_runs RENAME TO pipeline_runs_guardless"))
+        connection.execute(
+            text(
+                """
+                CREATE TABLE pipeline_runs (
+                    id CHAR(32) NOT NULL PRIMARY KEY,
+                    pipeline_id CHAR(32) NOT NULL,
+                    run_id VARCHAR(255) NOT NULL,
+                    status VARCHAR(9) NOT NULL,
+                    started_at DATETIME NOT NULL,
+                    finished_at DATETIME,
+                    duration_ms INTEGER,
+                    error_message TEXT,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "unique constraint 'uq_pipeline_runs_pipeline_run_id' on pipeline_runs is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+
+
+def test_ignores_missing_non_unique_index(tmp_path, script_directory):
+    """A plain index only affects speed, so it never blocks adoption."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'slow_but_valid.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "ix_alerts_pipeline_id"'))
+
+    with engine.connect() as connection:
+        assert _adopt(connection, script_directory) == 0
+
+
+def _rebuilt_alert_index(tmp_path, db_name, index_ddl: str) -> list[str]:
+    """Return the gaps of a create_all schema whose alert guard is index_ddl."""
+    engine = create_engine(f"sqlite:///{tmp_path / db_name}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+        connection.execute(text(index_ddl))
+    with engine.connect() as connection:
+        return _live_gaps(connection)
+
+
+def test_refuses_a_plain_index_that_only_borrows_the_guard_name(tmp_path, script_directory):
+    """A non-unique index named uq_active_alert still allows duplicate active alerts."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'borrowed_name.db'}")
+    Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+        connection.execute(text("CREATE INDEX uq_active_alert ON alerts (pipeline_id, type, run_id, message)"))
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "unique index 'uq_active_alert' on alerts is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+
+
+def test_refuses_a_guard_over_the_wrong_columns(tmp_path):
+    """The guard must cover the columns revision 0003 declares, not a subset."""
+    gaps = _rebuilt_alert_index(
+        tmp_path, "wrong_columns.db", "CREATE UNIQUE INDEX uq_active_alert ON alerts (pipeline_id)"
+    )
+    assert "unique index 'uq_active_alert' on alerts covers a different column set" in gaps
+
+
+def test_refuses_a_guard_without_its_partial_predicate(tmp_path):
+    """A full unique index also blocks a new alert after the first one is resolved."""
+    gaps = _rebuilt_alert_index(
+        tmp_path,
+        "not_partial.db",
+        "CREATE UNIQUE INDEX uq_active_alert ON alerts (pipeline_id, type, run_id, message)",
+    )
+    assert "unique index 'uq_active_alert' on alerts is not a partial index" in gaps
+
+
+def test_refuses_a_guard_with_the_wrong_predicate(tmp_path):
+    """An index over resolved rows lets every live duplicate through."""
+    gaps = _rebuilt_alert_index(
+        tmp_path,
+        "wrong_predicate.db",
+        "CREATE UNIQUE INDEX uq_active_alert ON alerts (pipeline_id, type, run_id, message) WHERE resolved = 1",
+    )
+    assert "unique index 'uq_active_alert' on alerts has a different predicate" in gaps
+
+
+def test_accepts_a_guard_written_with_other_spacing(tmp_path):
+    """Spacing and grouping brackets are spelling, not a different rule."""
+    gaps = _rebuilt_alert_index(
+        tmp_path,
+        "spaced_predicate.db",
+        "CREATE UNIQUE INDEX uq_active_alert ON alerts (pipeline_id, type, run_id, message) WHERE (resolved = 0)",
+    )
+    assert gaps == []
+
+
+def test_accepts_a_guard_the_server_reprinted_with_its_own_casts():
+    """PostgreSQL stores a predicate as text and answers in its own spelling."""
+    model = "resolved = false AND type = 'no_run'"
+    live = "((resolved = false) AND (type = 'no_run'::text))"
+
+    assert _normalized_predicate(live) == _normalized_predicate(model)
+    wrong = "((resolved = false) AND (type = 'failure'::text))"
+    assert _normalized_predicate(wrong) != _normalized_predicate(model)
+
+
+def test_refuses_a_guard_whose_literal_is_written_in_another_case(tmp_path, script_directory):
+    """A guard selects on a value, so 'NO_RUN' does not protect the rows 'no_run' means."""
+    engine = _create_all_db(tmp_path, "case_predicate.db")
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_active_alert"'))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_active_alert "
+                "ON alerts (pipeline_id, type, run_id, message) "
+                "WHERE resolved = false AND type = 'NO_RUN'"
+            )
+        )
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "unique index 'uq_active_alert' on alerts has a different predicate" in gaps
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_no_run_guard_with_cast_syntax_inside_literal(tmp_path, script_directory):
+    """Cast-like text is part of the value and must never authorize a schema stamp."""
+    engine = _create_all_db(tmp_path, "literal_cast_predicate.db")
+    with engine.begin() as connection:
+        connection.execute(text('DROP INDEX "uq_open_no_run_alert"'))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX uq_open_no_run_alert ON alerts (pipeline_id) "
+                "WHERE resolved = 0 AND type = 'no_run::text'"
+            )
+        )
+
+    with engine.connect() as connection:
+        assert "unique index 'uq_open_no_run_alert' on alerts has a different predicate" in _live_gaps(connection)
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def _create_all_db(tmp_path, db_name: str):
+    """Return a SQLite database built by create_all, so it has no alembic_version row."""
+    engine = create_engine(f"sqlite:///{tmp_path / db_name}")
+    Base.metadata.create_all(engine)
+    return engine
+
+
+_RUNS_COLUMNS = """
+    id CHAR(32) NOT NULL PRIMARY KEY,
+    pipeline_id CHAR(32) NOT NULL,
+    run_id VARCHAR(255) NOT NULL,
+    status VARCHAR(7) NOT NULL,
+    started_at DATETIME NOT NULL,
+    finished_at DATETIME,
+    duration_ms INTEGER,
+    error_message TEXT,
+    created_at DATETIME NOT NULL
+"""
+
+
+def _runs_table_ddl(guard: bool = True, parent_table: str | None = "pipelines") -> str:
+    """Build the pipeline_runs DDL create_all produces, with a piece taken out."""
+    parts = [_RUNS_COLUMNS]
+    if guard:
+        parts.append("CONSTRAINT uq_pipeline_runs_pipeline_run_id UNIQUE (pipeline_id, run_id)")
+    if parent_table:
+        parts.append(f"FOREIGN KEY (pipeline_id) REFERENCES {parent_table} (id)")
+    return "CREATE TABLE pipeline_runs (" + ", ".join(parts) + ")"
+
+
+def _rebuilt_runs_db(tmp_path, db_name: str, ddl: str, extra: str | None = None):
+    """Return a create_all database whose pipeline_runs table was rebuilt as ddl."""
+    engine = _create_all_db(tmp_path, db_name)
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE pipeline_runs"))
+        connection.execute(text(ddl))
+        if extra:
+            connection.execute(text(extra))
+    return engine
+
+
+def test_refuses_a_missing_foreign_key(tmp_path, script_directory):
+    """A run row that points nowhere survives revision 0007, which adds the key."""
+    engine = _rebuilt_runs_db(tmp_path, "no_fk.db", _runs_table_ddl(parent_table=None))
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "foreign key on pipeline_runs (pipeline_id) is missing" in gaps
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_a_foreign_key_to_the_wrong_table(tmp_path, script_directory):
+    """A key of the right shape but the wrong target keeps orphan runs invisible."""
+    engine = _rebuilt_runs_db(tmp_path, "wrong_fk.db", _runs_table_ddl(parent_table="organizations"))
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "foreign key on pipeline_runs (pipeline_id) points at organizations, not pipelines" in gaps
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_a_column_of_another_type(tmp_path, script_directory):
+    """A text duration cannot hold the integer the model writes."""
+    engine = _rebuilt_runs_db(
+        tmp_path, "wrong_type.db", _runs_table_ddl().replace("duration_ms INTEGER", "duration_ms VARCHAR(50)")
+    )
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "column pipeline_runs.duration_ms holds varchar, not integer" in gaps
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_a_column_narrower_than_the_model(tmp_path, script_directory):
+    """A short run_id would truncate the keys a client already sends."""
+    engine = _rebuilt_runs_db(
+        tmp_path, "narrow_column.db", _runs_table_ddl().replace("run_id VARCHAR(255)", "run_id VARCHAR(20)")
+    )
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert "column pipeline_runs.run_id is 20 wide, not 255" in gaps
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_a_partial_index_in_place_of_full_uniqueness(tmp_path, script_directory):
+    """A guard over finished runs still accepts a second row for the same run key."""
+    engine = _rebuilt_runs_db(
+        tmp_path,
+        "partial_full_guard.db",
+        _runs_table_ddl(guard=False),
+        extra=(
+            "CREATE UNIQUE INDEX uq_pipeline_runs_pipeline_run_id "
+            "ON pipeline_runs (pipeline_id, run_id) WHERE status = 'success'"
+        ),
+    )
+
+    with engine.connect() as connection:
+        gaps = _live_gaps(connection)
+        assert (
+            "unique constraint 'uq_pipeline_runs_pipeline_run_id' on pipeline_runs is partial, and must not be"
+        ) in gaps
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_a_database_with_orphan_rows(tmp_path, script_directory):
+    """A create_all database can hold rows no key would allow, SQLite enforcing none by default."""
+    engine = _create_all_db(tmp_path, "orphans.db")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO pipeline_runs "
+                "(id, pipeline_id, run_id, status, started_at, created_at) "
+                "VALUES ('a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1', :missing, 'r1', 'success', :now, :now)"
+            ),
+            {"missing": "0" * 32, "now": "2026-01-01 00:00:00"},
+        )
+
+    with engine.connect() as connection:
+        assert _live_gaps(connection) == []
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_refuses_a_driver_it_cannot_compare(tmp_path, script_directory, monkeypatch):
+    """An unknown driver reports too little about predicates for a stamp to be safe."""
+    engine = _create_all_db(tmp_path, "unknown_driver.db")
+
+    class UnknownInspector:
+        dialect = SimpleNamespace(name="unknownsql")
+
+        def get_table_names(self):
+            return ["pipelines", "pipeline_runs"]
+
+    monkeypatch.setattr("app.scripts.adopt_baseline.inspect", lambda connection: UnknownInspector())
+    with engine.connect() as connection:
+        assert _adopt(connection, script_directory) == 1
+        assert "alembic_version" not in inspect(connection).get_table_names()
+
+
+def test_create_all_schema_carries_the_migration_guards():
+    """The models mirror the revisions, so databases the seeders build are adoptable."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+
+    run_guards = {c["name"] for c in inspector.get_unique_constraints("pipeline_runs")}
+    alert_guards = {i["name"] for i in inspector.get_indexes("alerts") if i["unique"]}
+
+    assert "uq_pipeline_runs_pipeline_run_id" in run_guards
+    assert "uq_active_alert" in alert_guards
+
+
+def test_leaves_managed_and_empty_databases_alone(tmp_path, script_directory):
+    """Already-versioned and empty databases keep the normal migration behaviour."""
+    managed = create_engine(f"sqlite:///{tmp_path / 'managed.db'}")
+    Base.metadata.create_all(managed)
+    with managed.begin() as connection:
+        connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(255))"))
+        connection.execute(text("INSERT INTO alembic_version VALUES ('0001_initial')"))
+
+    with managed.connect() as connection:
+        assert _adopt(connection, script_directory) == 0
+        rows = connection.execute(text("SELECT version_num FROM alembic_version")).scalars().all()
+    assert rows == ["0001_initial"]
+
+    empty = create_engine(f"sqlite:///{tmp_path / 'empty.db'}")
+    with empty.connect() as connection:
+        assert _adopt(connection, script_directory) == 0
+        assert inspect(connection).get_table_names() == []

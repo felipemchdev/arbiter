@@ -9,15 +9,29 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SECRET_KEY = "change-me-in-production"
+DEVELOPMENT_ENVIRONMENTS = ("development", "test", "local")
+PLACEHOLDER_SECRET_KEYS = ("", "secret", "changeme", "replaceme", "jwt-secret", "your-secret-key")
+MIN_SECRET_KEY_LENGTH = 32
+
+
+def _is_placeholder_secret(key: str) -> bool:
+    """True when the value is empty or still a template placeholder."""
+    normalised = (key or "").strip().lower()
+    if not normalised or normalised in PLACEHOLDER_SECRET_KEYS:
+        return True
+    return "change_me" in normalised or "change-me" in normalised
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     project_name: str = "Arbiter"
     api_v1_str: str = "/api/v1"
+    environment: str = "development"
     database_url: str = "sqlite+aiosqlite:///./arbiter.db"
     redis_url: str = "redis://localhost:6379/0"
-    secret_key: str = "change-me-in-production"
+    secret_key: str = DEFAULT_SECRET_KEY
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
     refresh_token_rotation_enabled: bool = True
@@ -27,12 +41,39 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/1"
     cors_origins: Union[str, List[str]] = "http://localhost:3000"
     stale_pipeline_hours: int = 24
+    duration_baseline_samples: int = 20
+    duration_baseline_min_samples: int = 5
+    notifications_enabled: bool = True
+    notification_timeout_seconds: float = 5.0
+    notification_max_attempts: int = 5
+    notification_backoff_seconds: int = 60
 
     @field_validator("stale_pipeline_hours")
     @classmethod
     def _check_stale_hours(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("stale_pipeline_hours must be a positive integer")
+        return v
+
+    @field_validator("duration_baseline_samples", "duration_baseline_min_samples")
+    @classmethod
+    def _check_positive_baseline(cls, v: int, info) -> int:
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive integer")
+        return v
+
+    @field_validator("notification_timeout_seconds", "notification_backoff_seconds")
+    @classmethod
+    def _check_positive_notification_values(cls, v, info) -> Union[int, float]:
+        if v <= 0:
+            raise ValueError(f"{info.field_name} must be a positive number")
+        return v
+
+    @field_validator("notification_max_attempts")
+    @classmethod
+    def _check_notification_attempts(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("notification_max_attempts must be at least 1")
         return v
 
     @field_validator("cors_origins", mode="before")
@@ -67,9 +108,37 @@ class Settings(BaseSettings):
             raise ValueError(f"invalid auth_mode '{v}'. allowed: jwt_api_keys, jwt, api_keys")
         return v
 
+    @field_validator("environment")
+    @classmethod
+    def _check_environment(cls, v: str) -> str:
+        allowed = (*DEVELOPMENT_ENVIRONMENTS, "staging", "production")
+        if v not in allowed:
+            raise ValueError(f"invalid environment '{v}'. allowed: {', '.join(allowed)}")
+        return v
+
     def model_post_init(self, __context) -> None:
-        if self.secret_key == "change-me-in-production":
-            logger.warning("Using default SECRET_KEY - set ARBITER_SECRET_KEY env var for production.")
+        production = self.environment not in DEVELOPMENT_ENVIRONMENTS
+        if self.duration_baseline_samples < self.duration_baseline_min_samples:
+            raise RuntimeError(
+                f"DURATION_BASELINE_SAMPLES={self.duration_baseline_samples} is below "
+                f"DURATION_BASELINE_MIN_SAMPLES={self.duration_baseline_min_samples}. "
+                "No pipeline can reach a history baseline, so duration alerts never fire."
+            )
+        key = (self.secret_key or "").strip()
+        if _is_placeholder_secret(key):
+            if not production:
+                logger.warning("Using a placeholder SECRET_KEY - set SECRET_KEY before deploying.")
+                return
+            raise RuntimeError(
+                f"SECRET_KEY is empty or still a placeholder while ENVIRONMENT={self.environment!r}. "
+                "Generate one with `openssl rand -hex 32` and set SECRET_KEY; otherwise JWT access "
+                "tokens can be forged by anyone who knows the template value."
+            )
+        if production and len(key) < MIN_SECRET_KEY_LENGTH:
+            raise RuntimeError(
+                f"SECRET_KEY is only {len(key)} characters; a signing secret must be at least "
+                f"{MIN_SECRET_KEY_LENGTH} characters before running in {self.environment!r}."
+            )
 
 
 @lru_cache

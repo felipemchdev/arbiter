@@ -1,4 +1,4 @@
-name: Deploy Arbiter
+name: API Integration Tests
 
 on:
   push:
@@ -56,58 +56,3 @@ jobs:
           CELERY_BROKER_URL: redis://localhost:6379/0
           CELERY_RESULT_BACKEND: redis://localhost:6379/1
         run: pytest app/tests/ -v
-
-  build-and-deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      - name: Login to ACR
-        uses: azure/docker-login@v1
-        with:
-          login-server: arbiteracr.azurecr.io
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
-      - name: Build and push API
-        run: |
-          docker build -t arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} ./arbiter-api
-          docker push arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
-      - name: Build and push Dashboard
-        run: |
-          docker build \
-            --build-arg NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
-            --build-arg NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" \
-            -t arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }} ./arbiter-dashboard
-          docker push arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}
-      - name: Set secrets in Azure Container App
-        run: |
-          az containerapp secret set \
-            --name arbiter-api --resource-group rg-eeip \
-            --secrets \
-            arbiter-admin-user="${{ secrets.ARBITER_ADMIN_USER }}" \
-            arbiter-admin-password="${{ secrets.ARBITER_ADMIN_PASSWORD }}" \
-            arbiter-viewer-user="${{ secrets.ARBITER_VIEWER_USER }}" \
-            arbiter-viewer-password="${{ secrets.ARBITER_VIEWER_PASSWORD }}"
-      - name: Deploy API
-        run: |
-          az containerapp update \
-            --name arbiter-api --resource-group rg-eeip \
-            --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }} \
-            --set-env-vars \
-            ACCESS_TOKEN_EXPIRE_MINUTES=15 \
-            REFRESH_TOKEN_EXPIRE_DAYS=30 \
-            AUTH_MODE=jwt_api_keys \
-            API_KEYS_ENABLED=true \
-            CORS_ORIGINS="${{ secrets.CORS_ORIGINS }}" \
-            ARBITER_ADMIN_USER=secretref:arbiter-admin-user \
-            ARBITER_ADMIN_PASSWORD=secretref:arbiter-admin-password \
-            ARBITER_VIEWER_USER=secretref:arbiter-viewer-user \
-            ARBITER_VIEWER_PASSWORD=secretref:arbiter-viewer-password
-      - name: Deploy Worker
-        run: az containerapp update --name arbiter-worker --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-api:${{ github.sha }}
-      - name: Deploy Dashboard
-        run: az containerapp update --name arbiter-dashboard --resource-group rg-eeip --image arbiteracr.azurecr.io/arbiter-dashboard:${{ github.sha }}

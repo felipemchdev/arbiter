@@ -113,11 +113,13 @@ class TestSettingsDefaults:
 class TestSecretKeyGuard:
     """Default SECRET_KEY must not survive into a non-development environment."""
 
-    def test_default_key_allowed_in_development(self):
+    def test_default_key_allowed_in_development(self, monkeypatch):
+        monkeypatch.delenv("SECRET_KEY", raising=False)
         settings = Settings(_env_file=None, environment="development")  # type: ignore[call-arg]
         assert settings.secret_key == "change-me-in-production"
 
-    def test_default_key_rejected_in_production(self):
+    def test_default_key_rejected_in_production(self, monkeypatch):
+        monkeypatch.delenv("SECRET_KEY", raising=False)
         import pytest
 
         with pytest.raises(RuntimeError, match="SECRET_KEY"):

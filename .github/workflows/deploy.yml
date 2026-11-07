@@ -43,10 +43,15 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Migrate test database
+        env:
+          DATABASE_URL: postgresql+asyncpg://arbiter:arbiter@localhost:5432/arbiter_test
+        run: python -m alembic upgrade head
       - name: Run tests
         env:
           DATABASE_URL: postgresql+asyncpg://arbiter:arbiter@localhost:5432/arbiter_test
           REDIS_URL: redis://localhost:6379/0
+          TEST_REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-ci
           CELERY_BROKER_URL: redis://localhost:6379/0
           CELERY_RESULT_BACKEND: redis://localhost:6379/1

@@ -41,3 +41,16 @@ async def test_shared_window_admits_exactly_max_requests_under_concurrency():
     finally:
         await client.delete(key)
         await client.aclose()
+
+
+@pytest.mark.parametrize("iteration", [1, 2])
+async def test_api_rate_limit_has_a_fresh_budget_on_each_test_loop(client, caplog, iteration):
+    """Consecutive test loops use fresh pools and budgets while still enforcing limits."""
+    if not REDIS_URL:
+        pytest.skip("set TEST_REDIS_URL to exercise the API limiter against a real Redis")
+
+    for _ in range(100):
+        response = await client.get("/api/v1/rate-limit-probe")
+        assert response.status_code == 404
+    assert (await client.get("/api/v1/rate-limit-probe")).status_code == 429
+    assert "rate_limit_failure" not in caplog.text

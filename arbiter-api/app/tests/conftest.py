@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -12,6 +13,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.deps import get_db
+from app.core import redis as redis_module
 from app.core.database import Base
 from app.core.security import hash_password
 from app.main import app
@@ -38,6 +40,22 @@ async def setup_database() -> AsyncIterator[None]:
         TEST_DB_PATH.unlink()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def isolate_redis(monkeypatch) -> AsyncIterator[None]:
+    """Keep each test's Redis pool on its own loop and close it before that loop ends."""
+    from redis.asyncio import Redis
+
+    url = os.environ.get("TEST_REDIS_URL")
+    redis = Redis.from_url(url, decode_responses=True) if url else None
+    monkeypatch.setattr(redis_module, "_redis_client", redis)
+    monkeypatch.setattr(redis_module, "_build_redis_client", lambda: redis)
+    try:
+        yield
+    finally:
+        if redis is not None:
+            await redis.aclose()
+
+
 @pytest.fixture(autouse=True)
 def override_db():
     async def _get_test_db() -> AsyncIterator[AsyncSession]:
@@ -51,7 +69,9 @@ def override_db():
 
 @pytest_asyncio.fixture
 async def client() -> AsyncIterator[AsyncClient]:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client_instance:
+    # Each test gets a separate budget without flushing a shared Redis database.
+    transport = ASGITransport(app=app, client=(f"test-{uuid4().hex}", 123))
+    async with AsyncClient(transport=transport, base_url="http://test") as client_instance:
         yield client_instance
 
 

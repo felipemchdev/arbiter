@@ -83,12 +83,15 @@ async def test_deleting_a_pipeline_on_postgresql_removes_its_delivery_rows():
                     await session.flush()
                     org_id = org.id
                     pipeline_id = str(pipeline.id)
+                    alert_id = alert.id
 
                     deleted = await pipeline_service.delete_pipeline(session, pipeline_id, org_id)
 
                     assert deleted is True
-                    assert (await session.scalars(select(AlertDelivery))).all() == []
-                    assert (await session.scalars(select(Alert))).all() == []
+                    assert (await session.scalars(
+                        select(AlertDelivery).where(AlertDelivery.alert_id == alert_id)
+                    )).all() == []
+                    assert (await session.scalars(select(Alert).where(Alert.id == alert_id))).all() == []
             finally:
                 await outer.rollback()
     finally:

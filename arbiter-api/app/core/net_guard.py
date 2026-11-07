@@ -84,8 +84,9 @@ async def pin_target(url: str) -> PinnedTarget:
     authority = literal if parts.port is None else f"{literal}:{parts.port}"
     credentials, _, _ = parts.netloc.rpartition("@")
     netloc = f"{credentials}@{authority}" if credentials else authority
+    header_host = f"[{host}]" if ":" in host else host
     return PinnedTarget(
         url=urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment)),
-        host_header=host if parts.port is None else f"{host}:{parts.port}",
+        host_header=header_host if parts.port is None else f"{header_host}:{parts.port}",
         sni_hostname=host,
     )

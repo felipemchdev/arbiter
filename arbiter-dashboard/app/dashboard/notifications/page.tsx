@@ -127,7 +127,7 @@ export default function NotificationsPage() {
 
   const handleDelete = async (channel: NotificationChannel) => {
     if (!token) return;
-    if (!window.confirm(`Remove "${channel.name}"? Alert deliveries stop immediately.`)) return;
+    if (!window.confirm(`Remove "${channel.name}"? This stops future sends and permanently deletes its pending, delivered, and failed delivery records.`)) return;
     setError(null);
     try {
       await deleteNotificationChannel(channel.id, token);

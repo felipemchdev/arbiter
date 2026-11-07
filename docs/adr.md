@@ -33,9 +33,17 @@ retry, not a lost run event.
 
 **Consequences:**
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:18a7d2887a8958b048e9a2d7953f409a2e859f9e553947a219be1e96a924080a -->
+
 - The first send runs up to one minute after the alert, not immediately. A retried
-  delivery arrives later. After five attempts the row is failed and the receiver
-  gets nothing more for that alert.
+  delivery arrives later. `NOTIFICATION_MAX_ATTEMPTS` sets the attempt limit
+  (default: five attempts); operators can configure a lower limit. Once that
+  limit is reached, the row is failed and the receiver gets nothing more for
+  that alert.
+
+<!-- /coderabbit-ai-generated:v1 -->
 - A worker that dies mid-send leaves the row pending. The next pass sends it
   again, so a receiver can see one alert twice. Receivers should treat
   `X-Arbiter-Delivery` as an idempotency key.

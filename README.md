@@ -80,10 +80,17 @@ cp .env.example .env
 docker compose up -d
 ```
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:a41124f8416bb31578b4692949546e2493c7eca93bcbb059dd6905917b3afba9 -->
+
 Abra o `.env` antes de subir e troque cada valor `CHANGE_ME`. Use a mesma senha
 em `POSTGRES_PASSWORD` e dentro de `DATABASE_URL`. Os containers nao sobem sem
-`POSTGRES_PASSWORD`.
+`POSTGRES_PASSWORD`. Se a senha contiver caracteres especiais de URL, aplique
+URL-encoding somente ao valor da senha dentro de `DATABASE_URL`. Mantenha a
+senha original sem alteracoes em `POSTGRES_PASSWORD`.
 
+<!-- /coderabbit-ai-generated:v1 -->
 - Dashboard: http://localhost:3000
 - Documentacao da API: http://localhost:8000/docs
 - Health endpoint: http://localhost:8000/api/v1/health
@@ -278,10 +285,17 @@ cp .env.example .env
 docker compose up -d
 ```
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:cea3fc023849a16c62d45f44a46b1112a7dbc9c2fbeaec950064ea67e96de480 -->
+
 Open `.env` before you start the containers and replace every `CHANGE_ME`
 value. Use one password in `POSTGRES_PASSWORD` and in `DATABASE_URL`. The
-containers do not start without `POSTGRES_PASSWORD`.
+containers do not start without `POSTGRES_PASSWORD`. If the password contains
+URL-sensitive characters, URL-encode only the password value embedded in
+`DATABASE_URL`. Keep the original password unchanged in `POSTGRES_PASSWORD`.
 
+<!-- /coderabbit-ai-generated:v1 -->
 - Dashboard: http://localhost:3000
 - API docs: http://localhost:8000/docs
 - Health endpoint: http://localhost:8000/api/v1/health

@@ -38,11 +38,27 @@ That queue holds 1000 events. When the queue is full, the SDK drops the new
 event and writes `arbiter_queue_full` to the log. Watch that message when you
 run many jobs on one host.
 
-The SDK sends each event once. It does not retry a send that failed or that the
-API rejected. Such an event is lost.
+<!-- coderabbit-ai-generated:v1 -->
 
-When your process exits normally, the SDK waits up to five seconds to send what
-is left in the queue. Events still in the queue after that wait are lost. A
-process that another program kills can leave the queue unsent.
+<!-- coderabbit-ai-generated-section:v1:842f76d4aebb431fea3c920fba2d288f87fe015a2ad6366b4e2d87325a3d7c02 -->
+
+The SDK sends each event once. It does not retry a send that failed or that the
+API rejected. A failed request may have an unknown outcome: the API may have
+saved the run even if its response was lost.
+
+<!-- /coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:0d73e128b6638fdf44a3e0ca5819c5fcc7518c224fcd493fe1839e2db0ad5d29 -->
+
+Each Arbiter instance has its own dispatcher. When your process exits normally,
+the SDK waits up to five seconds per dispatcher to send what is left in its
+queue. This is not a process-wide five-second limit. Events still in the queue
+after that wait are lost. Events whose sends are still in progress may also be
+lost on normal process exit, even if already removed from the queue. A process
+that another program kills can leave the queue unsent.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Read the root README for the full Arbiter quickstart.

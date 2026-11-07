@@ -104,6 +104,18 @@ async def test_pin_target_wraps_an_ipv6_address_in_brackets(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("port_suffix", ["", ":443", ":8443"])
+async def test_pin_target_brackets_ipv6_literal_in_host_header(monkeypatch, port_suffix):
+    _use_loop(monkeypatch, _FakeLoop(answers=_answers(PUBLIC_V6)))
+
+    target = await pin_target(f"https://[{PUBLIC_V6}]{port_suffix}/hook")
+
+    assert target.host_header == f"[{PUBLIC_V6}]{port_suffix}"
+    assert target.url == f"https://[{PUBLIC_V6}]{port_suffix}/hook"
+    assert target.sni_hostname == PUBLIC_V6
+
+
+@pytest.mark.asyncio
 async def test_pin_target_refuses_a_name_that_resolves_locally(monkeypatch):
     _use_loop(monkeypatch, _FakeLoop(answers=_answers("10.0.0.5")))
 

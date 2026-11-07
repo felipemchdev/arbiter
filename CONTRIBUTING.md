@@ -3,10 +3,18 @@
 ## Development Setup
 
 1. Clone the repository and enter the folder.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d763f20f2d36638e35fa563742dccdea9e0796178647093b17af784d1db67ca4 -->
+
 2. Copy `.env.example` to `.env`. Replace every `CHANGE_ME` value. Put the same
    password in `POSTGRES_PASSWORD` and in the `DATABASE_URL` of the `arbiter`
    user. The containers do not start when one of the two values is missing, and
-   the API cannot reach PostgreSQL when they do not match.
+   the API cannot reach PostgreSQL when they do not match. If the password contains
+   URL-sensitive characters, URL-encode only the password value embedded in
+   `DATABASE_URL`. Keep the original password unchanged in `POSTGRES_PASSWORD`.
+
+<!-- /coderabbit-ai-generated:v1 -->
 3. Start the containers.
 
 ```sh

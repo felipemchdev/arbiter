@@ -104,7 +104,10 @@ jobs:
           set -euo pipefail
           output=$(pytest app/tests/test_pipeline_delete_postgres.py -v -m postgresql 2>&1)
           echo "$output"
-          echo "$output" | grep -q "1 passed"
+          echo "$output" | grep -Eq '^=+ 1 passed in .+ =+$'
+          if echo "$output" | grep -Eq '[0-9]+ (skipped|deselected)'; then
+            exit 1
+          fi
 
       - name: Create the seed database
         run: |

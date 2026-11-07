@@ -56,7 +56,14 @@ All notable changes to Arbiter are documented in this file.
 - A webhook channel URL that points at a local or private host is rejected at creation
   and re-checked before each send
 - `slow_threshold_ms` rejects a value above the 32-bit range the column stores
-- List queries break ties on the row id, so one page can no longer repeat or skip a row
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:ca57f59813f8ef280700def756dcb4489b75a4a2d03a238059263a891d07709b -->
+
+- List queries break ties on the row id for stable ordering; changes between requests
+  can still cause pagination to repeat or skip rows
+
+<!-- /coderabbit-ai-generated:v1 -->
 - The delivery claim commits before the HTTP send, so a slow endpoint no longer holds an
   open transaction
 - `NOTIFICATIONS_ENABLED=false` now stops both the queueing and the sending
